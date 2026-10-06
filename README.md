@@ -2,7 +2,7 @@
 
 Go-based distributed job scheduler. M0 provides the service skeleton and local dependencies; job scheduling and execution arrive in later milestones.
 
-## M0 quickstart
+## quickstart
 
 Requirements: Docker with the Compose plugin. Copy `.env.example` to `.env` if you want to override the local Postgres credentials, then run:
 
