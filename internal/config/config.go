@@ -20,3 +20,18 @@ func DatabaseURL() (string, error) {
 	}
 	return url, nil
 }
+
+func APIKey() (string, error) {
+	key := strings.TrimSpace(os.Getenv("API_KEY"))
+	if key == "" {
+		return "", fmt.Errorf("API_KEY is required")
+	}
+	return key, nil
+}
+
+func RedisAddr() string {
+	if addr := strings.TrimSpace(os.Getenv("REDIS_ADDR")); addr != "" {
+		return addr
+	}
+	return "localhost:6379"
+}

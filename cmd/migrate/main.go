@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"os"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/pressly/goose/v3"
 	"github.com/zishan044/distributed-job-scheduler/internal/config"
 	"github.com/zishan044/distributed-job-scheduler/internal/logging"
+	"github.com/zishan044/distributed-job-scheduler/internal/store/migrations"
 )
 
 func main() {
@@ -40,10 +40,7 @@ func run() error {
 		return err
 	}
 
-	provider, err := goose.NewProvider(goose.DialectPostgres, db, nil)
-	if errors.Is(err, goose.ErrNoMigrations) {
-		return nil
-	}
+	provider, err := goose.NewProvider(goose.DialectPostgres, db, migrations.FS)
 	if err != nil {
 		return err
 	}

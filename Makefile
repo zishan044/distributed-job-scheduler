@@ -1,4 +1,4 @@
-.PHONY: up down logs build lint
+.PHONY: up down logs build test lint
 
 up:
 	docker compose up --build
@@ -12,6 +12,9 @@ logs:
 build:
 	docker compose build
 
+test:
+	go test -count=1 -tags=integration ./test/integration
+
 lint:
-	@test -z "$$(gofmt -l $$(find cmd internal -type f -name '*.go'))"
+	@test -z "$$(gofmt -l $$(find cmd internal test -type f -name '*.go'))"
 	golangci-lint run ./...
