@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -22,8 +23,11 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 	"github.com/redis/go-redis/v9"
+	kafkago "github.com/segmentio/kafka-go"
 	"github.com/testcontainers/testcontainers-go"
+	kafkacontainer "github.com/testcontainers/testcontainers-go/modules/kafka"
 	"github.com/testcontainers/testcontainers-go/wait"
+	executorlib "github.com/zishan044/distributed-job-scheduler/internal/executor"
 	"github.com/zishan044/distributed-job-scheduler/internal/httpserver"
 	"github.com/zishan044/distributed-job-scheduler/internal/store"
 	"github.com/zishan044/distributed-job-scheduler/internal/store/migrations"
@@ -32,11 +36,12 @@ import (
 const apiKey = "integration-test-key"
 
 var (
-	data       *store.Store
-	cache      *redis.Client
-	api        http.Handler
-	database   *sql.DB
-	logger     = slog.New(slog.NewTextHandler(io.Discard, nil))
+	data         *store.Store
+	cache        *redis.Client
+	api          http.Handler
+	database     *sql.DB
+	kafkaBrokers []string
+	logger       = slog.New(slog.NewTextHandler(io.Discard, nil))
 )
 
 func TestMain(m *testing.M) {
@@ -112,6 +117,15 @@ func run(m *testing.M) int {
 	defer cache.Close()
 	if err := waitFor(ctx, func() error { return cache.Ping(ctx).Err() }); err != nil {
 		return setupFailure("connect to redis", err)
+	}
+	kafka, err := kafkacontainer.Run(ctx, "confluentinc/confluent-local:7.5.0")
+	if err != nil {
+		return setupFailure("start kafka container", err)
+	}
+	defer kafka.Terminate(context.Background())
+	kafkaBrokers, err = kafka.Brokers(ctx)
+	if err != nil {
+		return setupFailure("get kafka brokers", err)
 	}
 	api = httpserver.NewAPIRouter(logger, data, cache, apiKey)
 
@@ -358,6 +372,189 @@ func TestCreateIdempotencyUsesRedisAndDatabaseFallback(t *testing.T) {
 	if err != nil || len(runs) != 1 {
 		t.Fatalf("idempotent create left %d runs, err %v; want one run", len(runs), err)
 	}
+}
+
+func TestDispatchPublishFailureRollsBack(t *testing.T) {
+	job, err := data.CreateJob(context.Background(), store.Job{
+		Name: "dispatch-rollback-" + uuid.NewString(), Type: "handler", Payload: json.RawMessage(`{"handler":"noop"}`),
+	}, timePtr(time.Now().Add(-time.Second)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	runs, err := data.ListJobRuns(context.Background(), job.ID, 1, 0)
+	if err != nil || len(runs) != 1 {
+		t.Fatalf("ListJobRuns() = %d, %v", len(runs), err)
+	}
+	wantErr := errors.New("publish failed")
+	if _, err := data.DispatchDue(context.Background(), 10, func([]store.DispatchMessage) error { return wantErr }); !errors.Is(err, wantErr) {
+		t.Fatalf("DispatchDue error = %v; want %v", err, wantErr)
+	}
+	run, err := data.GetRun(context.Background(), runs[0].ID)
+	if err != nil || run.Status != "PENDING" {
+		t.Fatalf("after publish failure run = %+v, %v; want PENDING", run, err)
+	}
+	if _, err := data.CancelRun(context.Background(), runs[0].ID); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestScheduledJobDispatchesAndExecutes(t *testing.T) {
+	scheduledFor := time.Now().Add(3 * time.Second)
+	_, err := data.CreateJob(context.Background(), store.Job{
+		Name: "e2e-" + uuid.NewString(), Type: "handler", Payload: json.RawMessage(`{"handler":"noop"}`),
+	}, &scheduledFor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	topic := createKafkaTopic(t)
+	writer := kafkaWriter(topic)
+	defer writer.Close()
+	reader := kafkaReader(topic, "e2e-"+uuid.NewString())
+	defer reader.Close()
+	go func() {
+		ticker := time.NewTicker(200 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				_, _ = data.DispatchDue(ctx, 100, func(batch []store.DispatchMessage) error {
+					messages := make([]kafkago.Message, 0, len(batch))
+					for _, item := range batch {
+						value, err := json.Marshal(item)
+						if err != nil {
+							return err
+						}
+						messages = append(messages, kafkago.Message{Key: []byte(item.RunID), Value: value})
+					}
+					return writer.WriteMessages(ctx, messages...)
+				})
+			}
+		}
+	}()
+
+	message, err := reader.FetchMessage(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var dispatch store.DispatchMessage
+	if err := json.Unmarshal(message.Value, &dispatch); err != nil {
+		t.Fatal(err)
+	}
+	workerID := uuid.NewString()
+	claimed, err := data.StartRuns(ctx, []store.DispatchMessage{dispatch}, workerID)
+	if err != nil || len(claimed) != 1 {
+		t.Fatalf("StartRuns() = %d, %v; want one claim", len(claimed), err)
+	}
+	if err := reader.CommitMessages(ctx, message); err != nil {
+		t.Fatal(err)
+	}
+	run, err := data.GetRun(ctx, dispatch.RunID)
+	if err != nil || run.StartedAt == nil {
+		t.Fatalf("run start = %+v, %v", run, err)
+	}
+	if delay := run.StartedAt.Sub(scheduledFor); delay < 0 || delay > 2*time.Second {
+		t.Fatalf("start delay = %s; want 0-2s", delay)
+	}
+	if err := executorlib.Execute(ctx, executorlib.HTTPClient(nil), dispatch); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := data.SucceedRun(ctx, dispatch.RunID, dispatch.Attempt, workerID); err != nil || !ok {
+		t.Fatalf("SucceedRun() = %v, %v; want true, nil", ok, err)
+	}
+}
+
+func TestDuplicateKafkaDeliveryHasOneStartClaim(t *testing.T) {
+	_, err := data.CreateJob(context.Background(), store.Job{
+		Name: "duplicate-" + uuid.NewString(), Type: "handler", Payload: json.RawMessage(`{"handler":"noop"}`),
+	}, timePtr(time.Now().Add(-time.Second)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	topic := createKafkaTopic(t)
+	writer := kafkaWriter(topic)
+	defer writer.Close()
+	reader := kafkaReader(topic, "duplicate-"+uuid.NewString())
+	defer reader.Close()
+	if _, err := data.DispatchDue(context.Background(), 10, func(batch []store.DispatchMessage) error {
+		value, err := json.Marshal(batch[0])
+		if err != nil {
+			return err
+		}
+		return writer.WriteMessages(context.Background(),
+			kafkago.Message{Key: []byte(batch[0].RunID), Value: value},
+			kafkago.Message{Key: []byte(batch[0].RunID), Value: value},
+		)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	first, err := reader.FetchMessage(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := reader.FetchMessage(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var messages []store.DispatchMessage
+	for _, message := range []kafkago.Message{first, second} {
+		var dispatch store.DispatchMessage
+		if err := json.Unmarshal(message.Value, &dispatch); err != nil {
+			t.Fatal(err)
+		}
+		messages = append(messages, dispatch)
+	}
+	claimed, err := data.StartRuns(ctx, messages, uuid.NewString())
+	if err != nil || len(claimed) != 1 {
+		t.Fatalf("StartRuns() = %d claims, %v; want one", len(claimed), err)
+	}
+}
+
+func TestHTTPExecutionAndSSRFGuard(t *testing.T) {
+	called := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = r.Method == http.MethodPost && r.Header.Get("X-Test") == "yes"
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+	payload, _ := json.Marshal(map[string]any{"url": server.URL, "method": "POST", "headers": map[string]string{"X-Test": "yes"}, "body": "ok"})
+	message := store.DispatchMessage{Type: "http", Payload: payload, TimeoutMS: 1000}
+	if err := executorlib.Execute(context.Background(), executorlib.HTTPClient([]string{"127.0.0.1"}), message); err != nil {
+		t.Fatal(err)
+	}
+	if !called {
+		t.Fatal("HTTP executor did not send the configured request")
+	}
+	if err := executorlib.Execute(context.Background(), executorlib.HTTPClient(nil), message); err == nil {
+		t.Fatal("HTTP executor allowed a loopback target without an allowlist")
+	}
+}
+
+func createKafkaTopic(t *testing.T) string {
+	t.Helper()
+	topic := "test-" + uuid.NewString()
+	conn, err := kafkago.Dial("tcp", kafkaBrokers[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if err := conn.CreateTopics(kafkago.TopicConfig{Topic: topic, NumPartitions: 3, ReplicationFactor: 1}); err != nil {
+		t.Fatal(err)
+	}
+	return topic
+}
+
+func kafkaWriter(topic string) *kafkago.Writer {
+	return &kafkago.Writer{Addr: kafkago.TCP(kafkaBrokers...), Topic: topic, Balancer: &kafkago.Hash{}, RequiredAcks: kafkago.RequireAll}
+}
+
+func kafkaReader(topic, group string) *kafkago.Reader {
+	return kafkago.NewReader(kafkago.ReaderConfig{Brokers: kafkaBrokers, Topic: topic, GroupID: group, CommitInterval: 0})
 }
 
 func oneShotBody(t *testing.T, name string, scheduledFor time.Time) []byte {

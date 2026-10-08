@@ -1,0 +1,51 @@
+package config
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+)
+
+func KafkaBrokers() ([]string, error) {
+	value := strings.TrimSpace(os.Getenv("KAFKA_BROKERS"))
+	if value == "" {
+		return nil, fmt.Errorf("KAFKA_BROKERS is required")
+	}
+	var brokers []string
+	for _, broker := range strings.Split(value, ",") {
+		if broker = strings.TrimSpace(broker); broker != "" {
+			brokers = append(brokers, broker)
+		}
+	}
+	if len(brokers) == 0 {
+		return nil, fmt.Errorf("KAFKA_BROKERS is required")
+	}
+	return brokers, nil
+}
+
+func ExecutorConcurrency() (int, error) {
+	value := strings.TrimSpace(os.Getenv("EXECUTOR_CONCURRENCY"))
+	if value == "" {
+		return 10, nil
+	}
+	count, err := strconv.Atoi(value)
+	if err != nil || count < 1 || count > 1000 {
+		return 0, fmt.Errorf("EXECUTOR_CONCURRENCY must be between 1 and 1000")
+	}
+	return count, nil
+}
+
+func HTTPAllowedHosts() []string {
+	value := strings.TrimSpace(os.Getenv("HTTP_ALLOWED_HOSTS"))
+	if value == "" {
+		return nil
+	}
+	var hosts []string
+	for _, host := range strings.Split(value, ",") {
+		if host = strings.TrimSpace(host); host != "" {
+			hosts = append(hosts, strings.ToLower(host))
+		}
+	}
+	return hosts
+}

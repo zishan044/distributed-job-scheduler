@@ -74,6 +74,16 @@ type Run struct {
 	RetryOf         string     `json:"retry_of,omitempty"`
 }
 
+type DispatchMessage struct {
+	RunID     string          `json:"run_id"`
+	JobID     string          `json:"job_id"`
+	Attempt   int             `json:"attempt"`
+	Type      string          `json:"type"`
+	Payload   json.RawMessage `json:"payload"`
+	TimeoutMS int             `json:"timeout_ms"`
+	FireTime  time.Time       `json:"fire_time"`
+}
+
 const jobColumns = `id::text, name, type, payload, COALESCE(cron_expr, ''), timezone,
 	next_fire_at, misfire_policy, paused, max_attempts, backoff_base_ms,
 	backoff_max_ms, timeout_ms, COALESCE(idempotency_key, ''), created_at, deleted_at`
@@ -359,6 +369,121 @@ func (s *Store) QueueRun(ctx context.Context, id string) (bool, error) {
 		WHERE id = $1 AND status = 'PENDING' AND scheduled_for <= now()
 	`, dbID)
 	return tag.RowsAffected() == 1, err
+}
+
+// DispatchDue publishes a locked batch before marking it QUEUED and committing.
+// A successful publish followed by a failed commit can produce a duplicate;
+// StartRuns is the idempotent gate for that case.
+func (s *Store) DispatchDue(ctx context.Context, limit int, publish func([]DispatchMessage) error) (int, error) {
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > 2000 {
+		limit = 2000
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback(ctx)
+
+	rows, err := tx.Query(ctx, `
+		SELECT r.id::text, r.job_id::text, r.attempt, j.type, j.payload, j.timeout_ms, r.fire_time
+		FROM job_runs r JOIN jobs j ON j.id = r.job_id
+		WHERE r.status = 'PENDING' AND r.scheduled_for <= now()
+		ORDER BY r.scheduled_for
+		LIMIT $1 FOR UPDATE OF r SKIP LOCKED
+	`, limit)
+	if err != nil {
+		return 0, err
+	}
+	messages := make([]DispatchMessage, 0, limit)
+	for rows.Next() {
+		var message DispatchMessage
+		if err := rows.Scan(&message.RunID, &message.JobID, &message.Attempt, &message.Type, &message.Payload, &message.TimeoutMS, &message.FireTime); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		messages = append(messages, message)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	if len(messages) == 0 {
+		return 0, tx.Commit(ctx)
+	}
+	if err := publish(messages); err != nil {
+		return 0, err
+	}
+	for _, message := range messages {
+		id, err := parseUUID(message.RunID)
+		if err != nil {
+			return 0, err
+		}
+		if _, err := tx.Exec(ctx, `UPDATE job_runs SET status='QUEUED', queued_at=now() WHERE id=$1 AND status='PENDING'`, id); err != nil {
+			return 0, err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return 0, err
+	}
+	return len(messages), nil
+}
+
+// StartRuns conditionally claims a batch and records attempt starts atomically.
+func (s *Store) StartRuns(ctx context.Context, messages []DispatchMessage, workerID string) ([]DispatchMessage, error) {
+	worker, err := parseUUID(workerID)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	batch := &pgx.Batch{}
+	for _, message := range messages {
+		id, err := parseUUID(message.RunID)
+		if err != nil {
+			return nil, err
+		}
+		batch.Queue(`UPDATE job_runs SET status='RUNNING', worker_id=$3, started_at=now()
+			WHERE id=$1 AND attempt=$2 AND status='QUEUED' RETURNING started_at`, id, message.Attempt, worker)
+	}
+	results := tx.SendBatch(ctx, batch)
+	type startedRun struct {
+		message DispatchMessage
+		at      time.Time
+	}
+	started := make([]startedRun, 0, len(messages))
+	for _, message := range messages {
+		var at time.Time
+		if err := results.QueryRow().Scan(&at); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				continue
+			}
+			_ = results.Close()
+			return nil, err
+		}
+		started = append(started, startedRun{message: message, at: at})
+	}
+	if err := results.Close(); err != nil {
+		return nil, err
+	}
+	claimed := make([]DispatchMessage, 0, len(started))
+	for _, item := range started {
+		runID, _ := parseUUID(item.message.RunID)
+		if _, err := tx.Exec(ctx, `INSERT INTO run_attempts (run_id, attempt, worker_id, started_at) VALUES ($1,$2,$3,$4)`, runID, item.message.Attempt, worker, item.at); err != nil {
+			return nil, err
+		}
+		claimed = append(claimed, item.message)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return claimed, nil
 }
 
 func (s *Store) StartRun(ctx context.Context, id string, attempt int, workerID string) (bool, error) {

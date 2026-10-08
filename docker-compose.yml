@@ -106,6 +106,8 @@ services:
         SERVICE: watcher
     environment:
       HTTP_ADDR: :8080
+      DATABASE_URL: postgres://${POSTGRES_USER:-scheduler}:${POSTGRES_PASSWORD:-scheduler}@postgres:5432/${POSTGRES_DB:-scheduler}?sslmode=disable
+      KAFKA_BROKERS: kafka:9092
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -121,11 +123,20 @@ services:
         SERVICE: executor
     environment:
       HTTP_ADDR: :8080
+      DATABASE_URL: postgres://${POSTGRES_USER:-scheduler}:${POSTGRES_PASSWORD:-scheduler}@postgres:5432/${POSTGRES_DB:-scheduler}?sslmode=disable
+      KAFKA_BROKERS: kafka:9092
+      EXECUTOR_CONCURRENCY: ${EXECUTOR_CONCURRENCY:-10}
+      HTTP_ALLOWED_HOSTS: echo
     depends_on:
       migrate:
         condition: service_completed_successfully
       topic-init:
         condition: service_completed_successfully
+    restart: unless-stopped
+
+  echo:
+    image: hashicorp/http-echo:1.0.0
+    command: ["-listen=:5678", "-text=ok"]
     restart: unless-stopped
 
 volumes:
