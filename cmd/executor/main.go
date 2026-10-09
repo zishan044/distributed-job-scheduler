@@ -9,7 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/segmentio/kafka-go"
 	"github.com/zishan044/distributed-job-scheduler/internal/config"
 	"github.com/zishan044/distributed-job-scheduler/internal/executor"
@@ -60,16 +59,12 @@ func run(logger *slog.Logger) error {
 	}
 	defer dlq.Close()
 	client := executor.HTTPClient(config.HTTPAllowedHosts())
-	workerID, err := uuid.NewV7()
-	if err != nil {
-		return err
-	}
 
 	serveErr := make(chan error, 1)
 	go func() {
 		serveErr <- httpserver.Serve(config.HTTPAddr(), httpserver.NewRouter("executor", logger), logger)
 	}()
-	if err := executor.Consume(ctx, reader, data, client, dlq, workerID.String(), concurrency, logger); err != nil && !errors.Is(err, context.Canceled) {
+	if err := executor.Consume(ctx, reader, data, client, dlq, logger, executor.DefaultOptions(concurrency)); err != nil && !errors.Is(err, context.Canceled) {
 		return err
 	}
 	select {

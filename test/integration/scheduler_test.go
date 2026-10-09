@@ -178,7 +178,7 @@ func TestStoreStateTransitions(t *testing.T) {
 		t.Fatalf("ListJobRuns() = %d runs, err %v", len(runs), err)
 	}
 	runID := runs[0].ID
-	workerID := uuid.NewString()
+	workerID := registeredWorker(t, 5*time.Minute)
 
 	if queued, err := data.QueueRun(context.Background(), runID); err != nil || !queued {
 		t.Fatalf("QueueRun() = %v, %v; want true, nil", queued, err)
@@ -234,7 +234,7 @@ func TestCancelStartRace(t *testing.T) {
 		t.Fatalf("QueueRun() = %v, %v; want true, nil", queued, err)
 	}
 
-	workerID := uuid.NewString()
+	workerID := registeredWorker(t, 5*time.Minute)
 	start := make(chan struct{})
 	var wait sync.WaitGroup
 	wait.Add(2)
@@ -444,7 +444,7 @@ func TestScheduledJobDispatchesAndExecutes(t *testing.T) {
 	if err := json.Unmarshal(message.Value, &dispatch); err != nil {
 		t.Fatal(err)
 	}
-	workerID := uuid.NewString()
+	workerID := registeredWorker(t, 5*time.Minute)
 	claimed, err := data.StartRuns(ctx, []store.DispatchMessage{dispatch}, workerID)
 	if err != nil || len(claimed) != 1 {
 		t.Fatalf("StartRuns() = %d, %v; want one claim", len(claimed), err)
@@ -509,7 +509,7 @@ func TestDuplicateKafkaDeliveryHasOneStartClaim(t *testing.T) {
 		}
 		messages = append(messages, dispatch)
 	}
-	claimed, err := data.StartRuns(ctx, messages, uuid.NewString())
+	claimed, err := data.StartRuns(ctx, messages, registeredWorker(t, 5*time.Minute))
 	if err != nil || len(claimed) != 1 {
 		t.Fatalf("StartRuns() = %d claims, %v; want one", len(claimed), err)
 	}

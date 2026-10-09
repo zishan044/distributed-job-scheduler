@@ -456,10 +456,17 @@ func (s *Store) StartRuns(ctx context.Context, messages []DispatchMessage, worke
 	if _, err := tx.Exec(ctx, `SELECT id FROM job_runs WHERE id=ANY($1) ORDER BY id FOR UPDATE`, ids); err != nil {
 		return nil, err
 	}
+	if alive, err := workerAlive(ctx, tx, worker); err != nil {
+		return nil, err
+	} else if !alive {
+		return nil, ErrLeaseLost
+	}
 	batch := &pgx.Batch{}
 	for i, message := range messages {
 		batch.Queue(`UPDATE job_runs SET status='RUNNING', worker_id=$3, started_at=now()
-			WHERE id=$1 AND attempt=$2 AND status='QUEUED' RETURNING started_at`, ids[i], message.Attempt, worker)
+			WHERE id=$1 AND attempt=$2 AND status='QUEUED'
+			AND EXISTS (SELECT 1 FROM workers WHERE id=$3 AND lease_expires_at > clock_timestamp())
+			RETURNING started_at`, ids[i], message.Attempt, worker)
 	}
 	results := tx.SendBatch(ctx, batch)
 	type startedRun struct {
@@ -489,6 +496,11 @@ func (s *Store) StartRuns(ctx context.Context, messages []DispatchMessage, worke
 		}
 		claimed = append(claimed, item.message)
 	}
+	if alive, err := workerAlive(ctx, tx, worker); err != nil {
+		return nil, err
+	} else if !alive {
+		return nil, ErrLeaseLost
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
@@ -517,11 +529,16 @@ func (s *Store) SucceedRun(ctx context.Context, id string, attempt int, workerID
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	var outcome string
+	// Check the lease only after waiting for any concurrent run transition.
+	if _, err := tx.Exec(ctx, `SELECT id FROM job_runs WHERE id=$1 FOR UPDATE`, dbID); err != nil {
+		return false, err
+	}
 	err = tx.QueryRow(ctx, `
 		UPDATE job_runs
 		SET status = CASE WHEN cancel_requested THEN 'CANCELLED' ELSE 'SUCCEEDED' END,
 		    finished_at = now()
 		WHERE id = $1 AND attempt = $2 AND worker_id = $3 AND status = 'RUNNING'
+		AND EXISTS (SELECT 1 FROM workers WHERE id=$3 AND lease_expires_at > clock_timestamp())
 		RETURNING status
 	`, dbID, attempt, dbWorkerID).Scan(&outcome)
 	if errors.Is(err, pgx.ErrNoRows) {

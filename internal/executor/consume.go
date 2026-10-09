@@ -7,11 +7,13 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/segmentio/kafka-go"
+	"github.com/zishan044/distributed-job-scheduler/internal/queue"
 	"github.com/zishan044/distributed-job-scheduler/internal/store"
 )
 
@@ -20,129 +22,180 @@ const (
 	resultTimeout = 5 * time.Second
 )
 
-// DeadLetter contains either a failed dispatch or the source of a malformed message.
-type DeadLetter struct {
-	Message *store.DispatchMessage `json:"message,omitempty"`
-	Error   string                 `json:"error"`
-	Source  *DeadLetterSource      `json:"source,omitempty"`
-}
-
-type DeadLetterSource struct {
-	Topic     string `json:"topic"`
-	Partition int    `json:"partition"`
-	Offset    int64  `json:"offset"`
-	Key       []byte `json:"key"`
-	RawValue  []byte `json:"raw_value"` // Base64 preserves malformed JSON and invalid UTF-8.
-}
-
-// Consume runs the bounded worker pool. The caller owns the concrete dependencies.
-func Consume(ctx context.Context, reader *kafka.Reader, data *store.Store, client *http.Client, dlq *kafka.Writer, workerID string, concurrency int, logger *slog.Logger) error {
-	if concurrency < 1 {
-		return fmt.Errorf("executor concurrency must be positive")
-	}
-	if id, err := uuid.Parse(workerID); err != nil || id == uuid.Nil {
-		return fmt.Errorf("invalid worker ID")
+// Consume owns worker identities and the bounded pool; callers own dependencies.
+func Consume(ctx context.Context, reader *kafka.Reader, data *store.Store, client *http.Client, dlq *kafka.Writer, logger *slog.Logger, options Options) error {
+	if err := options.validate(); err != nil {
+		return err
 	}
 	if dlq == nil || dlq.Async || dlq.RequiredAcks != kafka.RequireAll {
 		return fmt.Errorf("DLQ writer must be synchronous with RequireAll acknowledgements")
 	}
+	hostname, err := os.Hostname()
+	if err != nil {
+		return err
+	}
 	ctx, cancel := context.WithCancel(ctx)
-	var running sync.WaitGroup
-	defer func() {
-		cancel()
-		running.Wait()
-	}()
-	active := make(chan struct{}, concurrency)
+	var running, heartbeats sync.WaitGroup
+	defer func() { cancel(); running.Wait(); heartbeats.Wait() }()
+	active := make(chan struct{}, options.Concurrency)
+	var session *workerSession
+	// Hold fetched messages and their reserved slots until the batch is claimed.
+	// Re-registering a worker must not advance past an unclaimed Kafka message.
+	var pending []kafka.Message
+consuming:
 	for {
-		select {
-		case active <- struct{}{}:
-		case <-ctx.Done():
+		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		first, err := reader.FetchMessage(ctx)
-		if err != nil {
-			return err
-		}
-		messages := []kafka.Message{first}
-	collecting:
-		for len(messages) < concurrency {
-			select {
-			case active <- struct{}{}:
-			default:
-				break collecting
-			}
-			fetchCtx, stop := context.WithTimeout(ctx, claimWindow)
-			message, err := reader.FetchMessage(fetchCtx)
-			stop()
+		if session == nil || session.ctx.Err() != nil {
+			session, err = registerSession(ctx, data, hostname, options)
 			if err != nil {
-				<-active
-				if !errors.Is(err, context.DeadlineExceeded) {
+				logger.Warn("register worker failed", "error", err)
+				if err := wait(ctx, options.HeartbeatInterval); err != nil {
 					return err
 				}
-				break collecting
+				continue
 			}
-			messages = append(messages, message)
+			logger.Info("registered worker", "worker_id", session.id, "capacity", options.Concurrency)
+			owner := session
+			heartbeats.Add(1)
+			go func() { defer heartbeats.Done(); owner.keepLease(data, options, logger) }()
 		}
-
-		dispatches := make([]store.DispatchMessage, 0, len(messages))
-		for _, message := range messages {
+		if len(pending) == 0 {
+			select {
+			case active <- struct{}{}:
+			case <-session.ctx.Done():
+				continue
+			}
+			first, err := reader.FetchMessage(session.ctx)
+			if err != nil {
+				<-active
+				if errors.Is(context.Cause(session.ctx), store.ErrLeaseLost) {
+					continue
+				}
+				return err
+			}
+			pending = []kafka.Message{first}
+		collecting:
+			for len(pending) < options.Concurrency {
+				select {
+				case <-session.ctx.Done():
+					break collecting
+				case active <- struct{}{}:
+				default:
+					break collecting
+				}
+				fetchCtx, stop := context.WithTimeout(session.ctx, claimWindow)
+				message, err := reader.FetchMessage(fetchCtx)
+				stop()
+				if err != nil {
+					<-active
+					if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(context.Cause(session.ctx), store.ErrLeaseLost) {
+						return err
+					}
+					break collecting
+				}
+				pending = append(pending, message)
+			}
+		}
+		if session.ctx.Err() != nil {
+			continue
+		}
+		dispatches := make([]store.DispatchMessage, 0, len(pending))
+		for _, message := range pending {
 			dispatch, err := decode(message.Value)
 			if err == nil {
 				dispatches = append(dispatches, dispatch)
 				continue
 			}
-			publishCtx, stop := context.WithTimeout(ctx, resultTimeout)
-			publishErr := writeDeadLetter(publishCtx, dlq, message.Key, DeadLetter{
-				Error: err.Error(),
-				Source: &DeadLetterSource{
-					Topic: message.Topic, Partition: message.Partition, Offset: message.Offset,
-					Key: message.Key, RawValue: message.Value,
-				},
+			publishCtx, stop := context.WithTimeout(session.ctx, resultTimeout)
+			publishErr := queue.PublishDeadLetters(publishCtx, dlq, queue.DeadLetter{
+				Error:  err.Error(),
+				Source: &queue.DeadLetterSource{Topic: message.Topic, Partition: message.Partition, Offset: message.Offset, Key: message.Key, RawValue: message.Value},
 			})
 			stop()
 			if publishErr != nil {
+				if errors.Is(context.Cause(session.ctx), store.ErrLeaseLost) {
+					continue consuming
+				}
 				return fmt.Errorf("publish malformed message to DLQ: %w", publishErr)
 			}
-			<-active
 		}
 		var claimed []store.DispatchMessage
 		if len(dispatches) > 0 {
-			claimed, err = data.StartRuns(ctx, dispatches, workerID)
+			claimed, err = data.StartRuns(session.ctx, dispatches, session.id)
 			if err != nil {
-				return err
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+				// A failed commit may have persisted claims. Abandon this worker
+				// so the sweeper can recover them instead of renewing it forever.
+				logger.Warn("start claim failed", "worker_id", session.id, "error", err)
+				session.fence(logger)
+				continue
 			}
 		}
-		if err := reader.CommitMessages(ctx, messages...); err != nil {
+		if err := reader.CommitMessages(session.ctx, pending...); err != nil {
 			logger.Error("commit Kafka messages failed", "error", err)
 		}
-		for range len(dispatches) - len(claimed) {
+		for range len(pending) - len(claimed) {
 			<-active
 		}
+		pending = nil
+		owner := session
 		for _, item := range claimed {
+			key := attemptKey{id: item.RunID, attempt: item.Attempt}
+			jobCtx := owner.beginRun(ctx, key)
 			running.Add(1)
 			go func() {
 				defer running.Done()
 				defer func() { <-active }()
-				executionErr := Execute(ctx, client, item)
-				// A cancelled fetch context must not prevent recording the result.
-				resultCtx, stop := context.WithTimeout(context.WithoutCancel(ctx), resultTimeout)
-				defer stop()
+				defer owner.endRun(key)
+				if errors.Is(context.Cause(jobCtx), store.ErrLeaseLost) {
+					return
+				}
+				executionErr := jobCtx.Err()
 				if executionErr == nil {
-					applied, err := data.SucceedRun(resultCtx, item.RunID, item.Attempt, workerID)
+					executionErr = Execute(jobCtx, client, item)
+				}
+				if errors.Is(context.Cause(jobCtx), store.ErrLeaseLost) {
+					return
+				}
+				resultCtx, stop := context.WithTimeout(context.WithoutCancel(jobCtx), resultTimeout)
+				defer stop()
+				stopFence := context.AfterFunc(owner.ctx, func() {
+					if errors.Is(context.Cause(owner.ctx), store.ErrLeaseLost) {
+						stop()
+					}
+				})
+				defer stopFence()
+				if executionErr == nil {
+					applied, err := data.SucceedRun(resultCtx, item.RunID, item.Attempt, owner.id)
 					logResult(logger, item, applied, err)
 					return
 				}
 				logger.Warn("job execution failed", "run_id", item.RunID, "attempt", item.Attempt, "error", executionErr)
-				run, err := data.FailRun(resultCtx, item.RunID, item.Attempt, workerID, classify(executionErr))
+				run, err := data.FailRun(resultCtx, item.RunID, item.Attempt, owner.id, classify(executionErr))
 				logResult(logger, item, run.ID != "", err)
 				if err == nil && run.Status == "DEAD" {
 					// ponytail: best-effort after commit; add durable delivery if required.
-					if err := writeDeadLetter(resultCtx, dlq, []byte(item.RunID), DeadLetter{Message: &item, Error: executionErr.Error()}); err != nil {
+					if err := queue.PublishDeadLetters(resultCtx, dlq, queue.DeadLetter{Message: &item, Error: executionErr.Error()}); err != nil {
 						logger.Error("publish DEAD run to DLQ failed", "run_id", item.RunID, "attempt", item.Attempt, "error", err)
 					}
 				}
 			}()
 		}
+	}
+}
+
+func wait(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
 	}
 }
 
@@ -152,14 +205,6 @@ func logResult(logger *slog.Logger, item store.DispatchMessage, applied bool, er
 	} else if !applied {
 		logger.Warn("discarded stale job completion", "run_id", item.RunID, "attempt", item.Attempt)
 	}
-}
-
-func writeDeadLetter(ctx context.Context, writer *kafka.Writer, key []byte, letter DeadLetter) error {
-	value, err := json.Marshal(letter)
-	if err != nil {
-		return err
-	}
-	return writer.WriteMessages(ctx, kafka.Message{Key: key, Value: value})
 }
 
 func decode(value []byte) (store.DispatchMessage, error) {

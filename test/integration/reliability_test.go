@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/segmentio/kafka-go"
 	executorlib "github.com/zishan044/distributed-job-scheduler/internal/executor"
+	"github.com/zishan044/distributed-job-scheduler/internal/queue"
 	"github.com/zishan044/distributed-job-scheduler/internal/store"
 )
 
@@ -80,7 +81,7 @@ func waitForRun(t *testing.T, id, status string) store.Run {
 
 func TestFailureRetriesAndFencesAttempts(t *testing.T) {
 	message := queuedDispatch(t, store.Job{MaxAttempts: 3, BackoffBaseMS: 10, BackoffMaxMS: 20})
-	worker := uuid.NewString()
+	worker := registeredWorker(t, 5*time.Minute)
 	startAttempt(t, message, worker)
 	for _, tuple := range []struct {
 		attempt int
@@ -107,7 +108,7 @@ func TestFailureRetriesAndFencesAttempts(t *testing.T) {
 	}
 	queueRetry(t, message.RunID)
 	message.Attempt = 2
-	nextWorker := uuid.NewString()
+	nextWorker := registeredWorker(t, 5*time.Minute)
 	startAttempt(t, message, nextWorker)
 	if stale, err := data.FailRun(context.Background(), message.RunID, 1, worker, store.Failure{Error: "late failure"}); err != nil || stale.ID != "" {
 		t.Fatalf("late failure = %+v, %v", stale, err)
@@ -160,7 +161,7 @@ func TestStartClaimWaitsForDispatchTransaction(t *testing.T) {
 				t.Fatal("dispatcher did not publish")
 			}
 			t.Cleanup(func() { _, _ = data.CancelRun(context.Background(), message.RunID) })
-			worker := uuid.NewString()
+			worker := registeredWorker(t, 5*time.Minute)
 			claimed := make(chan bool, 1)
 			claimErr := make(chan error, 1)
 			go func() {
@@ -191,7 +192,7 @@ func TestStartClaimWaitsForDispatchTransaction(t *testing.T) {
 
 func TestFailureBackoffBoundsAndOverflow(t *testing.T) {
 	message := queuedDispatch(t, store.Job{MaxAttempts: 6, BackoffBaseMS: 10, BackoffMaxMS: 25})
-	worker := uuid.NewString()
+	worker := registeredWorker(t, 5*time.Minute)
 	for attempt, bound := range []time.Duration{10 * time.Millisecond, 20 * time.Millisecond, 25 * time.Millisecond, 25 * time.Millisecond} {
 		message.Attempt = attempt + 1
 		startAttempt(t, message, worker)
@@ -235,7 +236,7 @@ func TestPermanentExhaustedAndCancelledFinalization(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			message := queuedDispatch(t, store.Job{MaxAttempts: tc.attempts})
-			worker := uuid.NewString()
+			worker := registeredWorker(t, 5*time.Minute)
 			startAttempt(t, message, worker)
 			if tc.cancel {
 				if _, err := data.CancelRun(context.Background(), message.RunID); err != nil {
@@ -285,7 +286,7 @@ func TestFinalizationRollsBackWithoutAttemptHistory(t *testing.T) {
 	for _, fail := range []bool{true, false} {
 		t.Run(fmt.Sprintf("fail=%v", fail), func(t *testing.T) {
 			message := queuedDispatch(t, store.Job{})
-			worker := uuid.NewString()
+			worker := registeredWorker(t, 5*time.Minute)
 			startAttempt(t, message, worker)
 			if _, err := database.Exec(`DELETE FROM run_attempts WHERE run_id::text=$1`, message.RunID); err != nil {
 				t.Fatal(err)
@@ -333,11 +334,16 @@ func assertAttempt(t *testing.T, id string, attempt int, outcome, failure string
 
 func startConsumer(t *testing.T, topic, group string, client *http.Client, dlq *kafka.Writer, concurrency int) <-chan error {
 	t.Helper()
+	return startConsumerWithOptions(t, topic, group, client, dlq, executorlib.DefaultOptions(concurrency))
+}
+
+func startConsumerWithOptions(t *testing.T, topic, group string, client *http.Client, dlq *kafka.Writer, options executorlib.Options) <-chan error {
+	t.Helper()
 	ctx, stop := context.WithCancel(context.Background())
 	reader := kafkaReader(topic, group)
 	done := make(chan error, 1)
 	go func() {
-		err := executorlib.Consume(ctx, reader, data, client, dlq, uuid.NewString(), concurrency, logger)
+		err := executorlib.Consume(ctx, reader, data, client, dlq, logger, options)
 		_ = reader.Close()
 		done <- err
 		close(done)
@@ -370,7 +376,7 @@ func publishDispatch(t *testing.T, writer *kafka.Writer, message store.DispatchM
 	}
 }
 
-func readDeadLetter(t *testing.T, topic string) executorlib.DeadLetter {
+func readDeadLetter(t *testing.T, topic string) queue.DeadLetter {
 	t.Helper()
 	reader := kafkaReader(topic, "dlq-reader-"+uuid.NewString())
 	defer reader.Close()
@@ -380,7 +386,7 @@ func readDeadLetter(t *testing.T, topic string) executorlib.DeadLetter {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var letter executorlib.DeadLetter
+	var letter queue.DeadLetter
 	if err := json.Unmarshal(message.Value, &letter); err != nil {
 		t.Fatal(err)
 	}

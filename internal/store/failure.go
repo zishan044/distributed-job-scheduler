@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // Failure describes an execution error; the store owns retry scheduling.
@@ -29,10 +30,21 @@ func (s *Store) FailRun(ctx context.Context, id string, attempt int, workerID st
 		return Run{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+	run, err := failRun(ctx, tx, runID, attempt, worker, failure, false)
+	if err != nil || run.ID == "" {
+		return run, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return Run{}, err
+	}
+	return run, nil
+}
 
+// recovery requires an expired/missing worker; execution requires a live worker.
+func failRun(ctx context.Context, tx pgx.Tx, runID pgtype.UUID, attempt int, worker pgtype.UUID, failure Failure, recovery bool) (Run, error) {
 	var cancelled bool
 	var maxAttempts, baseMS, maxMS int
-	err = tx.QueryRow(ctx, `
+	err := tx.QueryRow(ctx, `
 		SELECT r.cancel_requested, j.max_attempts, j.backoff_base_ms, j.backoff_max_ms
 		FROM job_runs r JOIN jobs j ON j.id=r.job_id
 		WHERE r.id=$1 AND r.attempt=$2 AND r.worker_id=$3 AND r.status='RUNNING'
@@ -43,6 +55,11 @@ func (s *Store) FailRun(ctx context.Context, id string, attempt int, workerID st
 	}
 	if err != nil {
 		return Run{}, err
+	}
+	if alive, err := workerAlive(ctx, tx, worker); err != nil {
+		return Run{}, err
+	} else if alive == recovery {
+		return Run{}, nil
 	}
 
 	status, outcome := "DEAD", "DEAD"
@@ -67,16 +84,17 @@ func (s *Store) FailRun(ctx context.Context, id string, attempt int, workerID st
 			finished_at=CASE WHEN $4='PENDING' THEN NULL ELSE now() END,
 			last_error=$7
 		WHERE id=$1 AND attempt=$2 AND worker_id=$3 AND status='RUNNING'
+		AND (NOT EXISTS (SELECT 1 FROM workers WHERE id=$3 AND lease_expires_at > clock_timestamp()))=$8
 		RETURNING `+runColumns,
-		runID, attempt, worker, status, maxMS, baseMS, failure.Error,
+		runID, attempt, worker, status, maxMS, baseMS, failure.Error, recovery,
 	))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Run{}, nil
+	}
 	if err != nil {
 		return Run{}, err
 	}
 	if err := finishAttempt(ctx, tx, runID, attempt, worker, outcome, failure.Error); err != nil {
-		return Run{}, err
-	}
-	if err := tx.Commit(ctx); err != nil {
 		return Run{}, err
 	}
 	return run, nil
