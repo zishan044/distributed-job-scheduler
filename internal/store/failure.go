@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -10,8 +11,10 @@ import (
 
 // Failure describes an execution error; the store owns retry scheduling.
 type Failure struct {
-	Error     string
-	Permanent bool
+	Error      string
+	Permanent  bool
+	RetryAfter time.Duration
+	RetryAt    time.Time
 }
 
 // FailRun records a fenced failure and returns the committed run. A zero Run
@@ -70,12 +73,18 @@ func failRun(ctx context.Context, tx pgx.Tx, runID pgtype.UUID, attempt int, wor
 	}
 	// Retry settings are SQL int columns. Capping the shift at 31 bounds the
 	// bigint product even for extreme attempt counts; larger shifts exceed the cap.
+	var retryAt *time.Time
+	if !failure.RetryAt.IsZero() {
+		retryAt = &failure.RetryAt
+	}
 	run, err := scanRun(tx.QueryRow(ctx, `
 		UPDATE job_runs SET
 			status=$4,
-			scheduled_for=CASE WHEN $4='PENDING' THEN now() +
+			scheduled_for=CASE WHEN $4='PENDING' THEN GREATEST(now() +
 				(random() * LEAST($5::bigint, $6::bigint *
-				(1::bigint << LEAST(attempt-1, 31)))) * interval '1 millisecond'
+				(1::bigint << LEAST(attempt-1, 31)))) * interval '1 millisecond',
+				CASE WHEN $9::double precision>0 THEN clock_timestamp() + $9 * interval '1 second' END,
+				CASE WHEN $10::timestamptz>clock_timestamp() THEN $10 END)
 				ELSE scheduled_for END,
 			attempt=CASE WHEN $4='PENDING' THEN attempt+1 ELSE attempt END,
 			worker_id=CASE WHEN $4='PENDING' THEN NULL ELSE worker_id END,
@@ -86,7 +95,7 @@ func failRun(ctx context.Context, tx pgx.Tx, runID pgtype.UUID, attempt int, wor
 		WHERE id=$1 AND attempt=$2 AND worker_id=$3 AND status='RUNNING'
 		AND (NOT EXISTS (SELECT 1 FROM workers WHERE id=$3 AND lease_expires_at > clock_timestamp()))=$8
 		RETURNING `+runColumns,
-		runID, attempt, worker, status, maxMS, baseMS, failure.Error, recovery,
+		runID, attempt, worker, status, maxMS, baseMS, failure.Error, recovery, failure.RetryAfter.Seconds(), retryAt,
 	))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Run{}, nil

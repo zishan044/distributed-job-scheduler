@@ -26,7 +26,12 @@ func permanent(err error) error { return permanentError{err} }
 
 func classify(err error) store.Failure {
 	var target permanentError
-	return store.Failure{Error: err.Error(), Permanent: errors.As(err, &target)}
+	failure := store.Failure{Error: err.Error(), Permanent: errors.As(err, &target)}
+	var retry retryAfterError
+	if errors.As(err, &retry) {
+		failure.RetryAfter, failure.RetryAt = retry.after, retry.at
+	}
+	return failure
 }
 
 func Execute(ctx context.Context, client *http.Client, message store.DispatchMessage) error {
@@ -77,7 +82,7 @@ func Execute(ctx context.Context, client *http.Client, message store.DispatchMes
 		if err := json.Unmarshal(message.Payload, &payload); err != nil {
 			return permanent(fmt.Errorf("decode HTTP payload: %w", err))
 		}
-		return doHTTP(ctx, client, payload)
+		return doHTTP(ctx, client, payload, message.RunID, message.Attempt)
 	default:
 		return permanent(fmt.Errorf("unknown job type %q", message.Type))
 	}
