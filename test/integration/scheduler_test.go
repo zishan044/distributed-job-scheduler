@@ -68,7 +68,7 @@ func run(m *testing.M) int {
 	if err != nil {
 		return setupFailure("start postgres container", err)
 	}
-	defer postgres.Terminate(context.Background())
+	defer func() { _ = postgres.Terminate(context.Background()) }()
 
 	postgresURL, err := containerAddress(ctx, postgres, "5432/tcp", "postgres://scheduler:scheduler@")
 	if err != nil {
@@ -108,7 +108,7 @@ func run(m *testing.M) int {
 	if err != nil {
 		return setupFailure("start redis container", err)
 	}
-	defer redisContainer.Terminate(context.Background())
+	defer func() { _ = redisContainer.Terminate(context.Background()) }()
 	redisAddr, err := containerAddress(ctx, redisContainer, "6379/tcp", "")
 	if err != nil {
 		return setupFailure("get redis address", err)
@@ -122,7 +122,7 @@ func run(m *testing.M) int {
 	if err != nil {
 		return setupFailure("start kafka container", err)
 	}
-	defer kafka.Terminate(context.Background())
+	defer func() { _ = kafka.Terminate(context.Background()) }()
 	kafkaBrokers, err = kafka.Brokers(ctx)
 	if err != nil {
 		return setupFailure("get kafka brokers", err)
@@ -538,12 +538,17 @@ func TestHTTPExecutionAndSSRFGuard(t *testing.T) {
 func createKafkaTopic(t *testing.T) string {
 	t.Helper()
 	topic := "test-" + uuid.NewString()
-	conn, err := kafkago.Dial("tcp", kafkaBrokers[0])
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	// Client.CreateTopics also refreshes the transport shared by test writers.
+	client := &kafkago.Client{Addr: kafkago.TCP(kafkaBrokers...)}
+	response, err := client.CreateTopics(ctx, &kafkago.CreateTopicsRequest{
+		Topics: []kafkago.TopicConfig{{Topic: topic, NumPartitions: 3, ReplicationFactor: 1}},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
-	if err := conn.CreateTopics(kafkago.TopicConfig{Topic: topic, NumPartitions: 3, ReplicationFactor: 1}); err != nil {
+	if err := response.Errors[topic]; err != nil {
 		t.Fatal(err)
 	}
 	return topic

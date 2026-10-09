@@ -13,6 +13,7 @@ build:
 	docker compose build
 
 test:
+	go test -count=1 ./...
 	go test -count=1 -tags=integration ./test/integration
 
 lint:

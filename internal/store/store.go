@@ -190,7 +190,7 @@ func (s *Store) CreateJob(ctx context.Context, job Job, firstRunAt *time.Time) (
 	if err != nil {
 		return Job{}, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	created, err := scanJob(tx.QueryRow(ctx, `
 		INSERT INTO jobs (
@@ -385,7 +385,7 @@ func (s *Store) DispatchDue(ctx context.Context, limit int, publish func([]Dispa
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	rows, err := tx.Query(ctx, `
 		SELECT r.id::text, r.job_id::text, r.attempt, j.type, j.payload, j.timeout_ms, r.fire_time
@@ -441,16 +441,25 @@ func (s *Store) StartRuns(ctx context.Context, messages []DispatchMessage, worke
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
-	batch := &pgx.Batch{}
+	ids := make([]pgtype.UUID, 0, len(messages))
 	for _, message := range messages {
 		id, err := parseUUID(message.RunID)
 		if err != nil {
 			return nil, err
 		}
+		ids = append(ids, id)
+	}
+	// Kafka delivery can precede DispatchDue's commit. Wait for its row locks,
+	// then evaluate QUEUED in the next statement's fresh read-committed snapshot.
+	if _, err := tx.Exec(ctx, `SELECT id FROM job_runs WHERE id=ANY($1) ORDER BY id FOR UPDATE`, ids); err != nil {
+		return nil, err
+	}
+	batch := &pgx.Batch{}
+	for i, message := range messages {
 		batch.Queue(`UPDATE job_runs SET status='RUNNING', worker_id=$3, started_at=now()
-			WHERE id=$1 AND attempt=$2 AND status='QUEUED' RETURNING started_at`, id, message.Attempt, worker)
+			WHERE id=$1 AND attempt=$2 AND status='QUEUED' RETURNING started_at`, ids[i], message.Attempt, worker)
 	}
 	results := tx.SendBatch(ctx, batch)
 	type startedRun struct {
@@ -487,46 +496,11 @@ func (s *Store) StartRuns(ctx context.Context, messages []DispatchMessage, worke
 }
 
 func (s *Store) StartRun(ctx context.Context, id string, attempt int, workerID string) (bool, error) {
-	dbID, err := parseUUID(id)
-	if err != nil {
-		return false, err
-	}
-	dbWorkerID, err := parseUUID(workerID)
-	if err != nil {
-		return false, err
-	}
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return false, err
-	}
-	defer tx.Rollback(ctx)
-
-	var startedAt time.Time
-	err = tx.QueryRow(ctx, `
-		UPDATE job_runs
-		SET status = 'RUNNING', worker_id = $3, started_at = now()
-		WHERE id = $1 AND attempt = $2 AND status = 'QUEUED'
-		RETURNING started_at
-	`, dbID, attempt, dbWorkerID).Scan(&startedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	_, err = tx.Exec(ctx, `
-		INSERT INTO run_attempts (run_id, attempt, worker_id, started_at)
-		VALUES ($1, $2, $3, $4)
-	`, dbID, attempt, dbWorkerID, startedAt)
-	if err != nil {
-		return false, err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return false, err
-	}
-	return true, nil
+	claimed, err := s.StartRuns(ctx, []DispatchMessage{{RunID: id, Attempt: attempt}}, workerID)
+	return len(claimed) == 1, err
 }
 
+// SucceedRun finalizes an owned attempt. A committed cancellation wins over success.
 func (s *Store) SucceedRun(ctx context.Context, id string, attempt int, workerID string) (bool, error) {
 	dbID, err := parseUUID(id)
 	if err != nil {
@@ -540,32 +514,41 @@ func (s *Store) SucceedRun(ctx context.Context, id string, attempt int, workerID
 	if err != nil {
 		return false, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
-	tag, err := tx.Exec(ctx, `
+	var outcome string
+	err = tx.QueryRow(ctx, `
 		UPDATE job_runs
-		SET status = 'SUCCEEDED', finished_at = now()
+		SET status = CASE WHEN cancel_requested THEN 'CANCELLED' ELSE 'SUCCEEDED' END,
+		    finished_at = now()
 		WHERE id = $1 AND attempt = $2 AND worker_id = $3 AND status = 'RUNNING'
-	`, dbID, attempt, dbWorkerID)
-	if err != nil {
-		return false, err
-	}
-	if tag.RowsAffected() == 0 {
+		RETURNING status
+	`, dbID, attempt, dbWorkerID).Scan(&outcome)
+	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
 	}
-	tag, err = tx.Exec(ctx, `
-		UPDATE run_attempts
-		SET outcome = 'SUCCEEDED', finished_at = now()
-		WHERE run_id = $1 AND attempt = $2 AND worker_id = $3
-	`, dbID, attempt, dbWorkerID)
 	if err != nil {
 		return false, err
 	}
-	if tag.RowsAffected() != 1 {
-		return false, fmt.Errorf("run attempt missing for run %s attempt %d", id, attempt)
+	if err := finishAttempt(ctx, tx, dbID, attempt, dbWorkerID, outcome, ""); err != nil {
+		return false, err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return false, err
 	}
 	return true, nil
+}
+
+func finishAttempt(ctx context.Context, tx pgx.Tx, runID pgtype.UUID, attempt int, workerID pgtype.UUID, outcome, failure string) error {
+	tag, err := tx.Exec(ctx, `
+		UPDATE run_attempts SET outcome=$4, error=NULLIF($5, ''), finished_at=now()
+		WHERE run_id=$1 AND attempt=$2 AND worker_id=$3
+	`, runID, attempt, workerID, outcome, failure)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() != 1 {
+		return fmt.Errorf("run attempt missing for attempt %d", attempt)
+	}
+	return nil
 }

@@ -1,0 +1,133 @@
+package executor
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/zishan044/distributed-job-scheduler/internal/store"
+)
+
+func TestExecutionFailureClassification(t *testing.T) {
+	for _, status := range []int{200, 204, 301, 400, 401, 403, 404, 408, 409, 429, 500, 503, 599, 600} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(status)
+			}))
+			defer server.Close()
+			payload, _ := json.Marshal(httpPayload{URL: server.URL})
+			err := Execute(context.Background(), HTTPClient([]string{"127.0.0.1"}), store.DispatchMessage{Type: "http", Payload: payload, TimeoutMS: 1000})
+			if status >= 200 && status < 300 {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("expected execution failure")
+			}
+			wantPermanent := status != 429 && (status < 500 || status > 599)
+			if got := classify(err); got.Permanent != wantPermanent || got.Error == "" {
+				t.Fatalf("classify(%v) = %+v; permanent want %v", err, got, wantPermanent)
+			}
+		})
+	}
+
+	for _, tc := range []struct {
+		name, jobType, payload string
+	}{
+		{"invalid handler JSON", "handler", `{`},
+		{"unknown handler", "handler", `{"handler":"missing"}`},
+		{"invalid HTTP payload", "http", `[]`},
+		{"invalid URL", "http", `{"url":"file:///etc/passwd"}`},
+		{"invalid method", "http", `{"url":"http://example.com","method":"bad method"}`},
+		{"invalid header name", "http", `{"url":"http://example.com","headers":{"bad header":"ok"}}`},
+		{"invalid header value", "http", `{"url":"http://example.com","headers":{"X-Test":"bad\r\nvalue"}}`},
+		{"blocked target", "http", `{"url":"http://127.0.0.1:1"}`},
+		{"unknown type", "other", `{}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := Execute(context.Background(), HTTPClient(nil), store.DispatchMessage{Type: tc.jobType, Payload: json.RawMessage(tc.payload), TimeoutMS: 1000})
+			if err == nil || !classify(err).Permanent {
+				t.Fatalf("execution error = %v; want permanent failure", err)
+			}
+		})
+	}
+
+	t.Run("timeout", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			time.Sleep(100 * time.Millisecond)
+		}))
+		defer server.Close()
+		payload, _ := json.Marshal(httpPayload{URL: server.URL})
+		err := Execute(context.Background(), HTTPClient([]string{"127.0.0.1"}), store.DispatchMessage{Type: "http", Payload: payload, TimeoutMS: 10})
+		if err == nil || classify(err).Permanent {
+			t.Fatalf("execution error = %v; want retryable timeout", err)
+		}
+	})
+	t.Run("network error", func(t *testing.T) {
+		server := httptest.NewServer(http.NotFoundHandler())
+		server.Close()
+		payload, _ := json.Marshal(httpPayload{URL: server.URL})
+		err := Execute(context.Background(), HTTPClient([]string{"127.0.0.1"}), store.DispatchMessage{Type: "http", Payload: payload, TimeoutMS: 1000})
+		if err == nil || classify(err).Permanent {
+			t.Fatalf("execution error = %v; want retryable network error", err)
+		}
+	})
+	t.Run("oversized response", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(strings.Repeat("x", maxResponseBytes+1)))
+		}))
+		defer server.Close()
+		payload, _ := json.Marshal(httpPayload{URL: server.URL})
+		err := Execute(context.Background(), HTTPClient([]string{"127.0.0.1"}), store.DispatchMessage{Type: "http", Payload: payload, TimeoutMS: 1000})
+		if err == nil || !classify(err).Permanent {
+			t.Fatalf("execution error = %v; want permanent oversized response", err)
+		}
+	})
+}
+
+func TestDecodeDispatch(t *testing.T) {
+	valid := store.DispatchMessage{
+		RunID: uuid.NewString(), JobID: uuid.NewString(), Attempt: 1,
+		Type: "handler", Payload: json.RawMessage(`{"handler":"noop"}`),
+		TimeoutMS: 1000, FireTime: time.Now(),
+	}
+	for _, tc := range []struct {
+		name   string
+		mutate func(*store.DispatchMessage)
+	}{
+		{"valid", func(*store.DispatchMessage) {}},
+		{"invalid run ID", func(m *store.DispatchMessage) { m.RunID = "bad" }},
+		{"nil job ID", func(m *store.DispatchMessage) { m.JobID = uuid.Nil.String() }},
+		{"zero attempt", func(m *store.DispatchMessage) { m.Attempt = 0 }},
+		{"overflowing attempt", func(m *store.DispatchMessage) { m.Attempt = 1 << 31 }},
+		{"zero timeout", func(m *store.DispatchMessage) { m.TimeoutMS = 0 }},
+		{"overflowing timeout", func(m *store.DispatchMessage) { m.TimeoutMS = 1 << 31 }},
+		{"missing fire time", func(m *store.DispatchMessage) { m.FireTime = time.Time{} }},
+		{"unsupported type", func(m *store.DispatchMessage) { m.Type = "other" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			message := valid
+			tc.mutate(&message)
+			value, err := json.Marshal(message)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = decode(value)
+			if (err == nil) != (tc.name == "valid") {
+				t.Fatalf("decode() error = %v", err)
+			}
+		})
+	}
+	for _, value := range []string{"{", "null", "{}"} {
+		if _, err := decode([]byte(value)); err == nil {
+			t.Fatalf("decode(%q) accepted malformed dispatch", value)
+		}
+	}
+}

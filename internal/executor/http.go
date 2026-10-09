@@ -24,7 +24,7 @@ func HTTPClient(allowedHosts []string) *http.Client {
 		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
 			host, port, err := net.SplitHostPort(address)
 			if err != nil {
-				return nil, err
+				return nil, permanent(err)
 			}
 			_, trusted := allowed[strings.ToLower(net.JoinHostPort(host, port))]
 			if !trusted {
@@ -37,7 +37,9 @@ func HTTPClient(allowedHosts []string) *http.Client {
 			var lastErr error
 			for _, addr := range ips {
 				if !trusted && unsafeIP(addr.IP) {
-					lastErr = fmt.Errorf("target resolves to a non-public address")
+					if lastErr == nil {
+						lastErr = permanent(fmt.Errorf("target resolves to a non-public address"))
+					}
 					continue
 				}
 				conn, err := dialer.DialContext(ctx, network, net.JoinHostPort(addr.IP.String(), port))
@@ -73,7 +75,7 @@ func doHTTP(ctx context.Context, client *http.Client, payload struct {
 }) error {
 	u, err := url.Parse(payload.URL)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil {
-		return fmt.Errorf("invalid HTTP target URL")
+		return permanent(fmt.Errorf("invalid HTTP target URL"))
 	}
 	method := payload.Method
 	if method == "" {
@@ -81,9 +83,12 @@ func doHTTP(ctx context.Context, client *http.Client, payload struct {
 	}
 	req, err := http.NewRequestWithContext(ctx, method, u.String(), strings.NewReader(payload.Body))
 	if err != nil {
-		return fmt.Errorf("invalid HTTP request: %w", err)
+		return permanent(fmt.Errorf("invalid HTTP request: %w", err))
 	}
 	for name, value := range payload.Headers {
+		if !validHeader(name, value) {
+			return permanent(fmt.Errorf("invalid HTTP header %q", name))
+		}
 		req.Header.Set(name, value)
 	}
 	resp, err := client.Do(req)
@@ -96,10 +101,31 @@ func doHTTP(ctx context.Context, client *http.Client, payload struct {
 		return err
 	}
 	if len(body) > maxResponseBytes {
-		return fmt.Errorf("HTTP response exceeds %d bytes", maxResponseBytes)
+		return permanent(fmt.Errorf("HTTP response exceeds %d bytes", maxResponseBytes))
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("HTTP target returned status %d", resp.StatusCode)
+		err := fmt.Errorf("HTTP target returned status %d", resp.StatusCode)
+		if resp.StatusCode == http.StatusTooManyRequests || (resp.StatusCode >= 500 && resp.StatusCode <= 599) {
+			return err
+		}
+		return permanent(err)
 	}
 	return nil
+}
+
+func validHeader(name, value string) bool {
+	if name == "" {
+		return false
+	}
+	for _, c := range name {
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || strings.ContainsRune("!#$%&'*+-.^_`|~", c)) {
+			return false
+		}
+	}
+	for _, c := range value {
+		if (c < 32 && c != '\t') || c == 127 {
+			return false
+		}
+	}
+	return true
 }
