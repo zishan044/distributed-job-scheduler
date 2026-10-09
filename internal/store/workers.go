@@ -12,6 +12,16 @@ import (
 
 var ErrLeaseLost = errors.New("store: worker lease lost")
 
+type Cancellation struct {
+	RunID   string
+	Attempt int
+}
+
+type Heartbeat struct {
+	Renewed       bool
+	Cancellations []Cancellation
+}
+
 // RegisterWorker requires a new ID: expired identities must never be reused.
 func (s *Store) RegisterWorker(ctx context.Context, id, hostname string, capacity int, lease time.Duration) error {
 	worker, err := parseUUID(id)
@@ -29,21 +39,21 @@ func (s *Store) RegisterWorker(ctx context.Context, id, hostname string, capacit
 }
 
 // HeartbeatWorker cannot revive an expired lease, even if it waits for a lock.
-func (s *Store) HeartbeatWorker(ctx context.Context, id string, lease time.Duration) (bool, error) {
+func (s *Store) HeartbeatWorker(ctx context.Context, id string, lease time.Duration) (Heartbeat, error) {
 	worker, err := parseUUID(id)
 	if err != nil {
-		return false, err
+		return Heartbeat{}, err
 	}
 	if lease <= 0 {
-		return false, fmt.Errorf("invalid worker lease duration")
+		return Heartbeat{}, fmt.Errorf("invalid worker lease duration")
 	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return false, err
+		return Heartbeat{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	if _, err := tx.Exec(ctx, `SELECT id FROM workers WHERE id=$1 FOR UPDATE`, worker); err != nil {
-		return false, err
+		return Heartbeat{}, err
 	}
 	tag, err := tx.Exec(ctx, `
 		UPDATE workers SET last_heartbeat=clock_timestamp(),
@@ -51,12 +61,32 @@ func (s *Store) HeartbeatWorker(ctx context.Context, id string, lease time.Durat
 		WHERE id=$1 AND lease_expires_at > clock_timestamp()
 	`, worker, lease.Seconds())
 	if err != nil {
-		return false, err
+		return Heartbeat{}, err
+	}
+	result := Heartbeat{Renewed: tag.RowsAffected() == 1}
+	if result.Renewed {
+		rows, err := tx.Query(ctx, `SELECT id::text, attempt FROM job_runs
+			WHERE worker_id=$1 AND status='RUNNING' AND cancel_requested`, worker)
+		if err != nil {
+			return Heartbeat{}, err
+		}
+		for rows.Next() {
+			var item Cancellation
+			if err := rows.Scan(&item.RunID, &item.Attempt); err != nil {
+				rows.Close()
+				return Heartbeat{}, err
+			}
+			result.Cancellations = append(result.Cancellations, item)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return Heartbeat{}, err
+		}
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return false, err
+		return Heartbeat{}, err
 	}
-	return tag.RowsAffected() == 1, nil
+	return result, nil
 }
 
 func workerAlive(ctx context.Context, tx pgx.Tx, worker pgtype.UUID) (bool, error) {

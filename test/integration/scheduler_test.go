@@ -41,6 +41,7 @@ var (
 	api          http.Handler
 	database     *sql.DB
 	kafkaBrokers []string
+	databaseURL  string
 	logger       = slog.New(slog.NewTextHandler(io.Discard, nil))
 )
 
@@ -75,6 +76,7 @@ func run(m *testing.M) int {
 		return setupFailure("get postgres address", err)
 	}
 	postgresURL += "/scheduler?sslmode=disable"
+	databaseURL = postgresURL
 	database, err = sql.Open("pgx", postgresURL)
 	if err != nil {
 		return setupFailure("open postgres", err)

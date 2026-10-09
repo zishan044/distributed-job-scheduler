@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -16,19 +17,25 @@ type Options struct {
 	HeartbeatInterval time.Duration
 	LeaseDuration     time.Duration
 	SafetyMargin      time.Duration
+	DrainTimeout      time.Duration
 }
 
 func DefaultOptions(concurrency int) Options {
-	return Options{Concurrency: concurrency, HeartbeatInterval: 5 * time.Second, LeaseDuration: 15 * time.Second, SafetyMargin: time.Second}
+	return Options{Concurrency: concurrency, HeartbeatInterval: 5 * time.Second, LeaseDuration: 15 * time.Second, SafetyMargin: time.Second, DrainTimeout: 30 * time.Second}
 }
 
 func (o Options) validate() error {
 	if o.Concurrency < 1 || o.Concurrency > 1000 || o.HeartbeatInterval <= 0 || o.SafetyMargin <= 0 ||
-		o.LeaseDuration <= o.SafetyMargin || o.HeartbeatInterval >= o.LeaseDuration-o.SafetyMargin {
+		o.LeaseDuration <= o.SafetyMargin || o.HeartbeatInterval >= o.LeaseDuration-o.SafetyMargin || o.DrainTimeout <= 0 {
 		return fmt.Errorf("invalid executor capacity or lease timings")
 	}
 	return nil
 }
+
+var (
+	errRunCancelled = errors.New("job cancellation requested")
+	errDrainExpired = errors.New("executor shutdown drain expired")
+)
 
 type attemptKey struct {
 	id      string
@@ -44,7 +51,7 @@ type workerSession struct {
 	active   map[attemptKey]context.CancelCauseFunc
 }
 
-func registerSession(ctx context.Context, data *store.Store, hostname string, options Options) (*workerSession, error) {
+func registerSession(ctx, leaseCtx context.Context, data *store.Store, hostname string, options Options) (*workerSession, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return nil, err
@@ -60,8 +67,18 @@ func registerSession(ctx context.Context, data *store.Store, hostname string, op
 	if !time.Now().Before(deadline) {
 		return nil, store.ErrLeaseLost
 	}
-	sessionCtx, cancel := context.WithCancelCause(ctx)
+	sessionCtx, cancel := context.WithCancelCause(leaseCtx)
 	return &workerSession{id: id.String(), ctx: sessionCtx, cancel: cancel, deadline: deadline, active: make(map[attemptKey]context.CancelCauseFunc)}, nil
+}
+
+func (s *workerSession) cancelRuns(items []store.Cancellation) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, item := range items {
+		if cancel, ok := s.active[attemptKey{id: item.RunID, attempt: item.Attempt}]; ok {
+			cancel(errRunCancelled)
+		}
+	}
 }
 
 func (s *workerSession) beginRun(ctx context.Context, key attemptKey) context.Context {
@@ -104,9 +121,9 @@ func (s *workerSession) keepLease(data *store.Store, options Options, logger *sl
 	defer timer.Stop()
 	defer ticker.Stop()
 	type heartbeatResult struct {
-		sent    time.Time
-		renewed bool
-		err     error
+		sent      time.Time
+		heartbeat store.Heartbeat
+		err       error
 	}
 	results := make(chan heartbeatResult, 1)
 	var requests sync.WaitGroup
@@ -134,9 +151,9 @@ func (s *workerSession) keepLease(data *store.Store, options Options, logger *sl
 			go func() {
 				defer requests.Done()
 				defer stop()
-				renewed, err := data.HeartbeatWorker(requestCtx, s.id, options.LeaseDuration)
+				heartbeat, err := data.HeartbeatWorker(requestCtx, s.id, options.LeaseDuration)
 				select {
-				case results <- heartbeatResult{sent: sent, renewed: renewed, err: err}:
+				case results <- heartbeatResult{sent: sent, heartbeat: heartbeat, err: err}:
 				case <-s.ctx.Done():
 				}
 			}()
@@ -150,12 +167,13 @@ func (s *workerSession) keepLease(data *store.Store, options Options, logger *sl
 				logger.Warn("worker heartbeat failed", "worker_id", s.id, "error", result.err)
 				continue
 			}
-			if !result.renewed {
+			if !result.heartbeat.Renewed {
 				s.fence(logger)
 				return
 			}
 			deadline = result.sent.Add(options.LeaseDuration - options.SafetyMargin)
 			timer.Reset(time.Until(deadline))
+			s.cancelRuns(result.heartbeat.Cancellations)
 		}
 	}
 }

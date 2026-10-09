@@ -56,21 +56,30 @@ func run(logger *slog.Logger) error {
 	dlq := &kafka.Writer{
 		Addr: kafka.TCP(brokers...), Topic: "jobs.dlq", Balancer: &kafka.Hash{},
 		RequiredAcks: kafka.RequireAll, BatchTimeout: 5 * time.Millisecond,
+		// Bound background delivery too: Close waits for writer retries.
+		MaxAttempts: 1, ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second,
 	}
 	defer dlq.Close()
 	client := executor.HTTPClient(config.HTTPAllowedHosts())
+	defer client.CloseIdleConnections()
 
 	serveErr := make(chan error, 1)
 	go func() {
 		serveErr <- httpserver.Serve(config.HTTPAddr(), httpserver.NewRouter("executor", logger), logger)
 	}()
-	if err := executor.Consume(ctx, reader, data, client, dlq, logger, executor.DefaultOptions(concurrency)); err != nil && !errors.Is(err, context.Canceled) {
-		return err
-	}
+	consumeErr := make(chan error, 1)
+	go func() {
+		consumeErr <- executor.Consume(ctx, reader, data, client, dlq, logger, executor.DefaultOptions(concurrency))
+	}()
 	select {
 	case err := <-serveErr:
+		stop()
+		<-consumeErr
 		return err
-	default:
+	case err := <-consumeErr:
+		if err != nil && !errors.Is(err, context.Canceled) {
+			return err
+		}
 		return nil
 	}
 }

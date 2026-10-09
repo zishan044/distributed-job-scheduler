@@ -35,18 +35,43 @@ func Execute(ctx context.Context, client *http.Client, message store.DispatchMes
 		ctx, cancel = context.WithTimeout(ctx, time.Duration(message.TimeoutMS)*time.Millisecond)
 		defer cancel()
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	switch message.Type {
 	case "handler":
 		var payload struct {
-			Handler string `json:"handler"`
+			Handler    string `json:"handler"`
+			DurationMS int64  `json:"duration_ms"`
+			Error      string `json:"error"`
+			Permanent  bool   `json:"permanent"`
 		}
 		if err := json.Unmarshal(message.Payload, &payload); err != nil {
 			return permanent(fmt.Errorf("decode handler payload: %w", err))
 		}
-		if payload.Handler != "noop" {
+		switch payload.Handler {
+		case "noop":
+			return ctx.Err()
+		case "sleep":
+			if payload.DurationMS <= 0 || payload.DurationMS > int64((1<<63-1)/time.Millisecond) {
+				return permanent(fmt.Errorf("sleep requires a positive, non-overflowing duration_ms"))
+			}
+			return wait(ctx, time.Duration(payload.DurationMS)*time.Millisecond)
+		case "fail":
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			if payload.Error == "" {
+				payload.Error = "handler failure"
+			}
+			err := errors.New(payload.Error)
+			if payload.Permanent {
+				return permanent(err)
+			}
+			return err
+		default:
 			return permanent(fmt.Errorf("unknown handler %q", payload.Handler))
 		}
-		return nil
 	case "http":
 		var payload httpPayload
 		if err := json.Unmarshal(message.Payload, &payload); err != nil {

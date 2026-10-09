@@ -3,6 +3,8 @@ package executor
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,6 +14,40 @@ import (
 	"github.com/google/uuid"
 	"github.com/zishan044/distributed-job-scheduler/internal/store"
 )
+
+func TestReliabilityHandlers(t *testing.T) {
+	for _, tc := range []struct {
+		payload              string
+		wantError, permanent bool
+	}{
+		{`{"handler":"sleep","duration_ms":1}`, false, false},
+		{`{"handler":"sleep"}`, true, true},
+		{`{"handler":"sleep","duration_ms":-1}`, true, true},
+		{`{"handler":"sleep","duration_ms":9223372036854775807}`, true, true},
+		{`{"handler":"sleep","duration_ms":"invalid"}`, true, true},
+		{`{"handler":"fail"}`, true, false},
+		{`{"handler":"fail","error":"broken","permanent":true}`, true, true},
+	} {
+		err := Execute(context.Background(), nil, store.DispatchMessage{Type: "handler", Payload: json.RawMessage(tc.payload), TimeoutMS: 1000})
+		if (err != nil) != tc.wantError || (err != nil && classify(err).Permanent != tc.permanent) {
+			t.Fatalf("Execute(%s) = %v", tc.payload, err)
+		}
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	for _, handler := range []string{"sleep", "fail", "noop"} {
+		err := Execute(ctx, nil, store.DispatchMessage{Type: "handler", Payload: json.RawMessage(fmt.Sprintf(`{"handler":%q,"duration_ms":60000}`, handler))})
+		if !errors.Is(err, context.Canceled) || classify(err).Permanent {
+			t.Fatalf("cancelled %s = %v", handler, err)
+		}
+	}
+	ctx, stop := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer stop()
+	err := Execute(ctx, nil, store.DispatchMessage{Type: "handler", Payload: json.RawMessage(`{"handler":"sleep","duration_ms":60000}`)})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("sleep timeout = %v", err)
+	}
+}
 
 func TestExecutionFailureClassification(t *testing.T) {
 	for _, status := range []int{200, 204, 301, 400, 401, 403, 404, 408, 409, 429, 500, 503, 599, 600} {

@@ -24,6 +24,7 @@ func TestLeaseOptions(t *testing.T) {
 		func(o *Options) { o.SafetyMargin = 0 },
 		func(o *Options) { o.SafetyMargin = o.LeaseDuration },
 		func(o *Options) { o.HeartbeatInterval = o.LeaseDuration - o.SafetyMargin },
+		func(o *Options) { o.DrainTimeout = 0 },
 	} {
 		o := valid
 		change(&o)
@@ -55,5 +56,19 @@ func TestSelfFenceCancelsEveryOwnedAttempt(t *testing.T) {
 		if !errors.Is(context.Cause(job), store.ErrLeaseLost) {
 			t.Fatalf("cancel cause = %v", context.Cause(job))
 		}
+	}
+}
+
+func TestCancellationMatchesOwnedAttempt(t *testing.T) {
+	ctx, cancel := context.WithCancelCause(context.Background())
+	defer cancel(context.Canceled)
+	session := &workerSession{ctx: ctx, cancel: cancel, active: make(map[attemptKey]context.CancelCauseFunc)}
+	firstKey, nextKey := attemptKey{id: "run", attempt: 1}, attemptKey{id: "run", attempt: 2}
+	first, next := session.beginRun(ctx, firstKey), session.beginRun(ctx, nextKey)
+	defer session.endRun(firstKey)
+	defer session.endRun(nextKey)
+	session.cancelRuns([]store.Cancellation{{RunID: "run", Attempt: 1}, {RunID: "missing", Attempt: 1}})
+	if !errors.Is(context.Cause(first), errRunCancelled) || next.Err() != nil || session.ctx.Err() != nil {
+		t.Fatal("cancellation affected another attempt or the worker lease")
 	}
 }

@@ -35,10 +35,34 @@ func Consume(ctx context.Context, reader *kafka.Reader, data *store.Store, clien
 		return err
 	}
 	ctx, cancel := context.WithCancel(ctx)
+	leaseCtx, stopLeases := context.WithCancel(context.WithoutCancel(ctx))
+	executionCtx, stopExecution := context.WithCancelCause(leaseCtx)
 	var running, heartbeats sync.WaitGroup
-	defer func() { cancel(); running.Wait(); heartbeats.Wait() }()
+	// Fetch/claim cancellation starts the drain; leases stay alive until all
+	// bounded result writes finish. Only the drain deadline interrupts execution.
+	defer func() {
+		cancel()
+		done := make(chan struct{})
+		go func() { running.Wait(); close(done) }()
+		timer := time.NewTimer(options.DrainTimeout)
+		defer timer.Stop()
+		select {
+		case <-done:
+		case <-timer.C:
+			logger.Warn("shutdown drain expired; cancelling remaining jobs")
+			stopExecution(errDrainExpired)
+			<-done
+		}
+		stopExecution(context.Canceled)
+		stopLeases()
+		heartbeats.Wait()
+	}()
 	active := make(chan struct{}, options.Concurrency)
 	var session *workerSession
+	intakeCtx := ctx
+	stopIntake := func() {}
+	stopFence := func() bool { return false }
+	defer func() { stopFence(); stopIntake() }()
 	// Hold fetched messages and their reserved slots until the batch is claimed.
 	// Re-registering a worker must not advance past an unclaimed Kafka message.
 	var pending []kafka.Message
@@ -48,7 +72,7 @@ consuming:
 			return ctx.Err()
 		}
 		if session == nil || session.ctx.Err() != nil {
-			session, err = registerSession(ctx, data, hostname, options)
+			session, err = registerSession(ctx, leaseCtx, data, hostname, options)
 			if err != nil {
 				logger.Warn("register worker failed", "error", err)
 				if err := wait(ctx, options.HeartbeatInterval); err != nil {
@@ -56,6 +80,10 @@ consuming:
 				}
 				continue
 			}
+			stopFence()
+			stopIntake()
+			intakeCtx, stopIntake = context.WithCancel(ctx)
+			stopFence = context.AfterFunc(session.ctx, stopIntake)
 			logger.Info("registered worker", "worker_id", session.id, "capacity", options.Concurrency)
 			owner := session
 			heartbeats.Add(1)
@@ -64,10 +92,10 @@ consuming:
 		if len(pending) == 0 {
 			select {
 			case active <- struct{}{}:
-			case <-session.ctx.Done():
+			case <-intakeCtx.Done():
 				continue
 			}
-			first, err := reader.FetchMessage(session.ctx)
+			first, err := reader.FetchMessage(intakeCtx)
 			if err != nil {
 				<-active
 				if errors.Is(context.Cause(session.ctx), store.ErrLeaseLost) {
@@ -79,13 +107,13 @@ consuming:
 		collecting:
 			for len(pending) < options.Concurrency {
 				select {
-				case <-session.ctx.Done():
+				case <-intakeCtx.Done():
 					break collecting
 				case active <- struct{}{}:
 				default:
 					break collecting
 				}
-				fetchCtx, stop := context.WithTimeout(session.ctx, claimWindow)
+				fetchCtx, stop := context.WithTimeout(intakeCtx, claimWindow)
 				message, err := reader.FetchMessage(fetchCtx)
 				stop()
 				if err != nil {
@@ -98,7 +126,7 @@ consuming:
 				pending = append(pending, message)
 			}
 		}
-		if session.ctx.Err() != nil {
+		if intakeCtx.Err() != nil {
 			continue
 		}
 		dispatches := make([]store.DispatchMessage, 0, len(pending))
@@ -108,7 +136,7 @@ consuming:
 				dispatches = append(dispatches, dispatch)
 				continue
 			}
-			publishCtx, stop := context.WithTimeout(session.ctx, resultTimeout)
+			publishCtx, stop := context.WithTimeout(intakeCtx, resultTimeout)
 			publishErr := queue.PublishDeadLetters(publishCtx, dlq, queue.DeadLetter{
 				Error:  err.Error(),
 				Source: &queue.DeadLetterSource{Topic: message.Topic, Partition: message.Partition, Offset: message.Offset, Key: message.Key, RawValue: message.Value},
@@ -123,7 +151,7 @@ consuming:
 		}
 		var claimed []store.DispatchMessage
 		if len(dispatches) > 0 {
-			claimed, err = data.StartRuns(session.ctx, dispatches, session.id)
+			claimed, err = data.StartRuns(intakeCtx, dispatches, session.id)
 			if err != nil {
 				if ctx.Err() != nil {
 					return ctx.Err()
@@ -135,7 +163,7 @@ consuming:
 				continue
 			}
 		}
-		if err := reader.CommitMessages(session.ctx, pending...); err != nil {
+		if err := reader.CommitMessages(intakeCtx, pending...); err != nil {
 			logger.Error("commit Kafka messages failed", "error", err)
 		}
 		for range len(pending) - len(claimed) {
@@ -145,21 +173,24 @@ consuming:
 		owner := session
 		for _, item := range claimed {
 			key := attemptKey{id: item.RunID, attempt: item.Attempt}
-			jobCtx := owner.beginRun(ctx, key)
+			jobCtx := owner.beginRun(executionCtx, key)
 			running.Add(1)
 			go func() {
 				defer running.Done()
 				defer func() { <-active }()
 				defer owner.endRun(key)
-				if errors.Is(context.Cause(jobCtx), store.ErrLeaseLost) {
+				if errors.Is(context.Cause(owner.ctx), store.ErrLeaseLost) {
 					return
 				}
 				executionErr := jobCtx.Err()
 				if executionErr == nil {
 					executionErr = Execute(jobCtx, client, item)
 				}
-				if errors.Is(context.Cause(jobCtx), store.ErrLeaseLost) {
+				if errors.Is(context.Cause(owner.ctx), store.ErrLeaseLost) {
 					return
+				}
+				if cause := context.Cause(jobCtx); cause != nil {
+					executionErr = cause
 				}
 				resultCtx, stop := context.WithTimeout(context.WithoutCancel(jobCtx), resultTimeout)
 				defer stop()

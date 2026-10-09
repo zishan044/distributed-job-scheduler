@@ -44,7 +44,7 @@ func TestWorkerHeartbeatAndExpiredLeaseCannotRevive(t *testing.T) {
 	if err := database.QueryRow(`SELECT last_heartbeat FROM workers WHERE id::text=$1`, id).Scan(&before); err != nil {
 		t.Fatal(err)
 	}
-	if ok, err := data.HeartbeatWorker(context.Background(), id, 2*time.Second); err != nil || !ok {
+	if ok, err := data.HeartbeatWorker(context.Background(), id, 2*time.Second); err != nil || !ok.Renewed {
 		t.Fatalf("renew = %v, %v", ok, err)
 	}
 	var after time.Time
@@ -61,7 +61,7 @@ func TestWorkerHeartbeatAndExpiredLeaseCannotRevive(t *testing.T) {
 		t.Fatal("reused a worker identity")
 	}
 	expireWorker(t, id)
-	if ok, err := data.HeartbeatWorker(context.Background(), id, time.Minute); err != nil || ok {
+	if ok, err := data.HeartbeatWorker(context.Background(), id, time.Minute); err != nil || ok.Renewed {
 		t.Fatalf("revive expired worker = %v, %v", ok, err)
 	}
 
@@ -75,7 +75,7 @@ func TestWorkerHeartbeatAndExpiredLeaseCannotRevive(t *testing.T) {
 		t.Fatal(err)
 	}
 	type renewal struct {
-		ok  bool
+		ok  store.Heartbeat
 		err error
 	}
 	done := make(chan renewal, 1)
@@ -90,7 +90,7 @@ func TestWorkerHeartbeatAndExpiredLeaseCannotRevive(t *testing.T) {
 		t.Fatal(err)
 	}
 	result := <-done
-	if result.err != nil || result.ok {
+	if result.err != nil || result.ok.Renewed {
 		t.Fatalf("renewal after a lock wait revived the expired lease: %+v", result)
 	}
 }
@@ -291,7 +291,10 @@ func TestStuckQueuedSweepPreservesAttemptAndStartGate(t *testing.T) {
 }
 
 func fastWorkerOptions(concurrency int) executorlib.Options {
-	return executorlib.Options{Concurrency: concurrency, HeartbeatInterval: 100 * time.Millisecond, LeaseDuration: 3 * time.Second, SafetyMargin: 300 * time.Millisecond}
+	o := executorlib.DefaultOptions(concurrency)
+	o.HeartbeatInterval, o.LeaseDuration, o.SafetyMargin = 100*time.Millisecond, 3*time.Second, 300*time.Millisecond
+	o.DrainTimeout = 500 * time.Millisecond
+	return o
 }
 
 func fastWatcherOptions() watcher.Options {
