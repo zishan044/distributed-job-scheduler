@@ -1,0 +1,513 @@
+{
+  "uid": "job-scheduler",
+  "title": "Distributed Job Scheduler",
+  "description": "M4 observability. Cluster gauges are owned by the API; local metrics are aggregated across discovered replicas.",
+  "tags": [
+    "scheduler"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "editable": false,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Active workers",
+      "type": "stat",
+      "description": "Workers with live DB leases. API-owned cluster gauge; NaN means collection failed.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "scheduler-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scheduler-prometheus"
+          },
+          "expr": "max(active_workers{job=\"api\"})",
+          "legendFormat": "Workers",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "DLQ publications",
+      "type": "stat",
+      "description": "Acknowledged publications from current processes, including malformed dispatches. Counters reset on process restart; DEAD rows remain authoritative.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "scheduler-prometheus"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scheduler-prometheus"
+          },
+          "expr": "sum(dlq_total{job=~\"watcher|executor\"})",
+          "legendFormat": "Acknowledgements",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Kafka consumer-group lag",
+      "type": "timeseries",
+      "description": "Retained jobs.run offsets awaiting executor group commits. Commit happens after the DB start claim, before execution finishes. NaN means collection failed.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "scheduler-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scheduler-prometheus"
+          },
+          "expr": "max(kafka_consumer_lag{job=\"api\"})",
+          "legendFormat": "Uncommitted offsets",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Start latency and 2s SLA",
+      "type": "timeseries",
+      "description": "Current attempt scheduled_for to accepted start; retry backoff is excluded. Histogram quantiles need executions in the selected rate interval.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "scheduler-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "2s SLA"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scheduler-prometheus"
+          },
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(start_latency_seconds_bucket{job=\"executor\"}[$__rate_interval])))",
+          "legendFormat": "p50",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scheduler-prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(start_latency_seconds_bucket{job=\"executor\"}[$__rate_interval])))",
+          "legendFormat": "p95",
+          "refId": "B",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scheduler-prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(start_latency_seconds_bucket{job=\"executor\"}[$__rate_interval])))",
+          "legendFormat": "p99",
+          "refId": "C",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scheduler-prometheus"
+          },
+          "expr": "vector(2)",
+          "legendFormat": "2s SLA",
+          "refId": "D",
+          "instant": false,
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "In-flight jobs",
+      "type": "timeseries",
+      "description": "Actually executing jobs, excluding reserved fetch slots. Each line is an executor replica.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "scheduler-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scheduler-prometheus"
+          },
+          "expr": "inflight_jobs{job=\"executor\"}",
+          "legendFormat": "{{instance}}",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Retry and zombie recovery rates",
+      "type": "timeseries",
+      "description": "Committed transitions per second. Zombie recoveries stay zero until a worker lease expires with running work.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "scheduler-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scheduler-prometheus"
+          },
+          "expr": "sum(rate(retries_total{job=~\"watcher|executor\"}[$__rate_interval]))",
+          "legendFormat": "Retries",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scheduler-prometheus"
+          },
+          "expr": "sum(rate(zombies_recovered_total{job=\"watcher\"}[$__rate_interval]))",
+          "legendFormat": "Zombie recoveries",
+          "refId": "B",
+          "instant": false,
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "DB pool saturation",
+      "type": "timeseries",
+      "description": "Acquired connections / configured maximum per process. Uses native local pgx statistics, not a DB availability probe.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "scheduler-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scheduler-prometheus"
+          },
+          "expr": "pgxpool_acquired_conns{job=~\"api|watcher|executor\"} / pgxpool_max_conns{job=~\"api|watcher|executor\"}",
+          "legendFormat": "{{job}} {{instance}}",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Scheduler throughput",
+      "type": "timeseries",
+      "description": "Committed creates, dispatches and attempt outcomes per second. Counts retries as separate attempt outcomes.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "scheduler-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scheduler-prometheus"
+          },
+          "expr": "sum(rate(jobs_created_total{job=\"api\"}[$__rate_interval]))",
+          "legendFormat": "Jobs created",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scheduler-prometheus"
+          },
+          "expr": "sum(rate(watcher_claimed_total{job=\"watcher\"}[$__rate_interval]))",
+          "legendFormat": "Runs dispatched",
+          "refId": "B",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scheduler-prometheus"
+          },
+          "expr": "sum(rate(executions_total{job=~\"watcher|executor\"}[$__rate_interval]))",
+          "legendFormat": "Attempt outcomes",
+          "refId": "C",
+          "instant": false,
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Healthy scrape targets",
+      "type": "stat",
+      "description": "Number of reachable replicas per service. DNS discovery tracks Compose scaling without a Docker socket mount.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "scheduler-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 24,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scheduler-prometheus"
+          },
+          "expr": "sum by (job) (up{job=~\"api|watcher|executor\"})",
+          "legendFormat": "{{job}}",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ]
+    }
+  ]
+}

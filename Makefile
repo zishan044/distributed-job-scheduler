@@ -1,4 +1,4 @@
-.PHONY: up down logs build test lint
+.PHONY: up down logs build test lint smoke
 
 up:
 	docker compose up --build
@@ -11,6 +11,9 @@ logs:
 
 build:
 	docker compose build
+
+smoke:
+	docker compose run --build --rm --no-deps smoke
 
 test:
 	go test -count=1 ./...
