@@ -8,8 +8,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -80,6 +82,10 @@ func waitForRun(t *testing.T, id, status string) store.Run {
 }
 
 func TestFailureRetriesAndFencesAttempts(t *testing.T) {
+	failed := counterValue(t, "executions_total", "failed")
+	succeeded := counterValue(t, "executions_total", "succeeded")
+	retries := counterValue(t, "retries_total", "")
+	stale := counterValue(t, "stale_completions_total", "")
 	message := queuedDispatch(t, store.Job{MaxAttempts: 3, BackoffBaseMS: 10, BackoffMaxMS: 20})
 	worker := registeredWorker(t, 5*time.Minute)
 	startAttempt(t, message, worker)
@@ -109,7 +115,14 @@ func TestFailureRetriesAndFencesAttempts(t *testing.T) {
 	queueRetry(t, message.RunID)
 	message.Attempt = 2
 	nextWorker := registeredWorker(t, 5*time.Minute)
+	latencySum := metric(t, "start_latency_seconds", "").GetHistogram().GetSampleSum()
 	startAttempt(t, message, nextWorker)
+	startedRun := waitForRun(t, message.RunID, "RUNNING")
+	gotLatency := metric(t, "start_latency_seconds", "").GetHistogram().GetSampleSum() - latencySum
+	wantLatency := startedRun.StartedAt.Sub(startedRun.ScheduledFor).Seconds()
+	if math.Abs(gotLatency-wantLatency) > 0.000001 {
+		t.Fatalf("retry start latency = %v, want current scheduled_for delta %v", gotLatency, wantLatency)
+	}
 	if stale, err := data.FailRun(context.Background(), message.RunID, 1, worker, store.Failure{Error: "late failure"}); err != nil || stale.ID != "" {
 		t.Fatalf("late failure = %+v, %v", stale, err)
 	}
@@ -117,11 +130,18 @@ func TestFailureRetriesAndFencesAttempts(t *testing.T) {
 		t.Fatalf("retry success = %v, %v", ok, err)
 	}
 	assertAttempt(t, message.RunID, 2, "SUCCEEDED", "", nil, 0)
+	assertCounter(t, "executions_total", "failed", failed+1)
+	assertCounter(t, "executions_total", "succeeded", succeeded+1)
+	assertCounter(t, "retries_total", "", retries+1)
+	assertCounter(t, "stale_completions_total", "", stale+5)
 }
 
 func TestStartClaimWaitsForDispatchTransaction(t *testing.T) {
 	for _, rollback := range []bool{false, true} {
 		t.Run(fmt.Sprintf("rollback=%v", rollback), func(t *testing.T) {
+			starts := metric(t, "start_latency_seconds", "").GetHistogram().GetSampleCount()
+			claimedBefore := counterValue(t, "watcher_claimed_total", "")
+			dispatchedBefore := metric(t, "dispatch_latency_seconds", "").GetHistogram().GetSampleCount()
 			ctx, stop := context.WithTimeout(context.Background(), 5*time.Second)
 			defer stop()
 			job, err := data.CreateJob(ctx, store.Job{
@@ -135,8 +155,9 @@ func TestStartClaimWaitsForDispatchTransaction(t *testing.T) {
 			defer releaseDispatch()
 			dispatched := make(chan error, 1)
 			publishErr := errors.New("publish failed")
+			var dispatchCount int
 			go func() {
-				_, err := data.DispatchDue(ctx, 100, func(batch []store.DispatchMessage) error {
+				count, err := data.DispatchDue(ctx, 100, func(batch []store.DispatchMessage) error {
 					for _, message := range batch {
 						if message.JobID == job.ID {
 							published <- message
@@ -152,6 +173,7 @@ func TestStartClaimWaitsForDispatchTransaction(t *testing.T) {
 					}
 					return nil
 				})
+				dispatchCount = count
 				dispatched <- err
 			}()
 			var message store.DispatchMessage
@@ -180,6 +202,21 @@ func TestStartClaimWaitsForDispatchTransaction(t *testing.T) {
 			}
 			if ok, err := <-claimed, <-claimErr; err != nil || ok == rollback {
 				t.Fatalf("start after dispatch = %v, %v; rollback=%v", ok, err, rollback)
+			}
+			assertCounter(t, "watcher_claimed_total", "", claimedBefore+float64(dispatchCount))
+			if got := metric(t, "dispatch_latency_seconds", "").GetHistogram().GetSampleCount(); got != dispatchedBefore+uint64(dispatchCount) {
+				t.Fatalf("dispatch samples = %d, want %d", got, dispatchedBefore+uint64(dispatchCount))
+			}
+			wantStarts := starts
+			if !rollback {
+				wantStarts++
+				run := waitForRun(t, message.RunID, "RUNNING")
+				if run.StartedAt.Before(*run.QueuedAt) {
+					t.Fatal("start timestamp excluded the wait for dispatch to commit")
+				}
+			}
+			if got := metric(t, "start_latency_seconds", "").GetHistogram().GetSampleCount(); got != wantStarts {
+				t.Fatalf("accepted start samples = %d, want %d", got, wantStarts)
 			}
 			if !rollback {
 				if ok, err := data.SucceedRun(ctx, message.RunID, 1, worker); err != nil || !ok {
@@ -235,6 +272,8 @@ func TestPermanentExhaustedAndCancelledFinalization(t *testing.T) {
 		{"cancel before success", false, 5, true, true, "CANCELLED"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			outcomes := counterValue(t, "executions_total", strings.ToLower(tc.status))
+			successes := counterValue(t, "executions_total", "succeeded")
 			message := queuedDispatch(t, store.Job{MaxAttempts: tc.attempts})
 			worker := registeredWorker(t, 5*time.Minute)
 			startAttempt(t, message, worker)
@@ -260,6 +299,8 @@ func TestPermanentExhaustedAndCancelledFinalization(t *testing.T) {
 			if stale, err := data.FailRun(context.Background(), message.RunID, 1, worker, store.Failure{Error: "duplicate"}); err != nil || stale.ID != "" {
 				t.Fatalf("terminal failure changed run: %+v, %v", stale, err)
 			}
+			assertCounter(t, "executions_total", strings.ToLower(tc.status), outcomes+1)
+			assertCounter(t, "executions_total", "succeeded", successes)
 		})
 	}
 }
@@ -285,6 +326,10 @@ func queueRetry(t *testing.T, id string) {
 func TestFinalizationRollsBackWithoutAttemptHistory(t *testing.T) {
 	for _, fail := range []bool{true, false} {
 		t.Run(fmt.Sprintf("fail=%v", fail), func(t *testing.T) {
+			failed := counterValue(t, "executions_total", "failed")
+			succeeded := counterValue(t, "executions_total", "succeeded")
+			retries := counterValue(t, "retries_total", "")
+			stale := counterValue(t, "stale_completions_total", "")
 			message := queuedDispatch(t, store.Job{})
 			worker := registeredWorker(t, 5*time.Minute)
 			startAttempt(t, message, worker)
@@ -304,6 +349,10 @@ func TestFinalizationRollsBackWithoutAttemptHistory(t *testing.T) {
 			if run.Attempt != 1 || run.WorkerID != worker || run.FinishedAt != nil || run.LastError != "" {
 				t.Fatalf("failed transaction changed run: %+v", run)
 			}
+			assertCounter(t, "executions_total", "failed", failed)
+			assertCounter(t, "executions_total", "succeeded", succeeded)
+			assertCounter(t, "retries_total", "", retries)
+			assertCounter(t, "stale_completions_total", "", stale)
 			if _, err := database.Exec(`INSERT INTO run_attempts (run_id, attempt, worker_id, started_at)
 				SELECT id, attempt, worker_id, started_at FROM job_runs WHERE id::text=$1`, message.RunID); err != nil {
 				t.Fatal(err)
@@ -428,6 +477,8 @@ func TestConsumerRetriesHTTPThenSucceeds(t *testing.T) {
 func TestConsumerRoutesPermanentAndExhaustedFailuresToDLQ(t *testing.T) {
 	for _, permanent := range []bool{true, false} {
 		t.Run(fmt.Sprintf("permanent=%v", permanent), func(t *testing.T) {
+			letters := counterValue(t, "dlq_total", "")
+			dead := counterValue(t, "executions_total", "dead")
 			status, attempts := http.StatusServiceUnavailable, 1
 			if permanent {
 				status, attempts = http.StatusBadRequest, 5
@@ -446,6 +497,8 @@ func TestConsumerRoutesPermanentAndExhaustedFailuresToDLQ(t *testing.T) {
 			if letter.Message == nil || letter.Message.RunID != message.RunID || letter.Message.Attempt != 1 || !bytes.Equal(letter.Message.Payload, payload) || letter.Source != nil || letter.Error == "" {
 				t.Fatalf("DEAD letter = %+v", letter)
 			}
+			assertCounter(t, "dlq_total", "", letters+1)
+			assertCounter(t, "executions_total", "dead", dead+1)
 		})
 	}
 }
@@ -491,6 +544,8 @@ func TestConsumerCancelledResultDoesNotRetryOrPublish(t *testing.T) {
 }
 
 func TestConsumerMalformedMessageThenValidWork(t *testing.T) {
+	letters := counterValue(t, "dlq_total", "")
+	durations := metric(t, "execution_duration_seconds", "handler").GetHistogram().GetSampleCount()
 	message := queuedDispatch(t, store.Job{})
 	topic, dlqTopic := createKafkaTopic(t), createKafkaTopic(t)
 	writer, dlq := kafkaWriter(topic), kafkaWriter(dlqTopic)
@@ -507,6 +562,10 @@ func TestConsumerMalformedMessageThenValidWork(t *testing.T) {
 		letter.Source.Topic != topic || !bytes.Equal(letter.Source.Key, []byte(message.RunID)) || letter.Source.Offset != 0 {
 		t.Fatalf("malformed letter = %+v", letter)
 	}
+	assertCounter(t, "dlq_total", "", letters+1)
+	if got := metric(t, "execution_duration_seconds", "handler").GetHistogram().GetSampleCount(); got != durations+1 {
+		t.Fatalf("execution samples = %d, want %d; malformed messages must not execute", got, durations+1)
+	}
 }
 
 func unavailableDLQ() *kafka.Writer {
@@ -517,6 +576,7 @@ func unavailableDLQ() *kafka.Writer {
 }
 
 func TestConsumerMalformedDLQFailureDoesNotCommit(t *testing.T) {
+	letters := counterValue(t, "dlq_total", "")
 	message := queuedDispatch(t, store.Job{})
 	topic, group := createKafkaTopic(t), "uncommitted-"+uuid.NewString()
 	writer, dlq := kafkaWriter(topic), unavailableDLQ()
@@ -544,9 +604,12 @@ func TestConsumerMalformedDLQFailureDoesNotCommit(t *testing.T) {
 	if err != nil || !bytes.Equal(redelivery.Value, bad.Value) || redelivery.Offset != 0 {
 		t.Fatalf("uncommitted redelivery = %+v, %v", redelivery, err)
 	}
+	assertCounter(t, "dlq_total", "", letters)
 }
 
 func TestConsumerDeadRowSurvivesDLQFailure(t *testing.T) {
+	letters := counterValue(t, "dlq_total", "")
+	dead := counterValue(t, "executions_total", "dead")
 	message := queuedDispatch(t, store.Job{Payload: json.RawMessage(`{"handler":"missing"}`)})
 	topic := createKafkaTopic(t)
 	writer, dlq := kafkaWriter(topic), unavailableDLQ()
@@ -562,6 +625,8 @@ func TestConsumerDeadRowSurvivesDLQFailure(t *testing.T) {
 	next := queuedDispatch(t, store.Job{})
 	publishDispatch(t, writer, next)
 	waitForRun(t, next.RunID, "SUCCEEDED")
+	assertCounter(t, "dlq_total", "", letters)
+	assertCounter(t, "executions_total", "dead", dead+1)
 }
 
 func assertEmptyTopic(t *testing.T, topic string) {

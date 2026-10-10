@@ -29,7 +29,6 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 	executorlib "github.com/zishan044/distributed-job-scheduler/internal/executor"
 	"github.com/zishan044/distributed-job-scheduler/internal/httpserver"
-	"github.com/zishan044/distributed-job-scheduler/internal/metrics"
 	"github.com/zishan044/distributed-job-scheduler/internal/store"
 	"github.com/zishan044/distributed-job-scheduler/internal/store/migrations"
 )
@@ -130,7 +129,7 @@ func run(m *testing.M) int {
 	if err != nil {
 		return setupFailure("get kafka brokers", err)
 	}
-	api = httpserver.NewAPIRouter(logger, data, cache, apiKey, metrics.New().Registry)
+	api = httpserver.NewAPIRouter(logger, data, cache, apiKey, data.Metrics.Registry)
 
 	return m.Run()
 }
@@ -168,6 +167,9 @@ func waitFor(ctx context.Context, check func() error) error {
 }
 
 func TestStoreStateTransitions(t *testing.T) {
+	starts := metric(t, "start_latency_seconds", "").GetHistogram().GetSampleCount()
+	successes := counterValue(t, "executions_total", "succeeded")
+	stale := counterValue(t, "stale_completions_total", "")
 	job, err := data.CreateJob(context.Background(), store.Job{
 		Name:    "transitions-" + uuid.NewString(),
 		Type:    "handler",
@@ -218,6 +220,11 @@ func TestStoreStateTransitions(t *testing.T) {
 	if outcome != "SUCCEEDED" {
 		t.Fatalf("attempt outcome = %q; want SUCCEEDED", outcome)
 	}
+	if got := metric(t, "start_latency_seconds", "").GetHistogram().GetSampleCount(); got != starts+1 {
+		t.Fatalf("accepted start samples = %d, want %d", got, starts+1)
+	}
+	assertCounter(t, "executions_total", "succeeded", successes+1)
+	assertCounter(t, "stale_completions_total", "", stale+2)
 }
 
 func TestCancelStartRace(t *testing.T) {
@@ -329,6 +336,8 @@ func TestAPIEndpointsAndAuthentication(t *testing.T) {
 }
 
 func TestCreateIdempotencyUsesRedisAndDatabaseFallback(t *testing.T) {
+	createdCount := counterValue(t, "jobs_created_total", "")
+	redisErrors := counterValue(t, "redis_errors_total", "")
 	key := "idem-" + uuid.NewString()
 	body := oneShotBody(t, "idempotent-"+uuid.NewString(), time.Now().Add(time.Hour))
 	first := perform(api, http.MethodPost, "/v1/jobs", body, apiKey, key)
@@ -350,6 +359,8 @@ func TestCreateIdempotencyUsesRedisAndDatabaseFallback(t *testing.T) {
 	if cached.ID != created.ID {
 		t.Fatalf("cached ID = %s; want %s", cached.ID, created.ID)
 	}
+	assertCounter(t, "jobs_created_total", "", createdCount+1)
+	assertCounter(t, "redis_errors_total", "", redisErrors)
 
 	unavailable := redis.NewClient(&redis.Options{
 		Addr:         "127.0.0.1:1",
@@ -359,7 +370,7 @@ func TestCreateIdempotencyUsesRedisAndDatabaseFallback(t *testing.T) {
 		WriteTimeout: 100 * time.Millisecond,
 	})
 	defer unavailable.Close()
-	fallbackAPI := httpserver.NewAPIRouter(logger, data, unavailable, apiKey, metrics.New().Registry)
+	fallbackAPI := httpserver.NewAPIRouter(logger, data, unavailable, apiKey, data.Metrics.Registry)
 	fallback := perform(fallbackAPI, http.MethodPost, "/v1/jobs", body, apiKey, key)
 	if fallback.Code != http.StatusCreated {
 		t.Fatalf("database fallback status = %d, body %s", fallback.Code, fallback.Body.String())
@@ -375,9 +386,13 @@ func TestCreateIdempotencyUsesRedisAndDatabaseFallback(t *testing.T) {
 	if err != nil || len(runs) != 1 {
 		t.Fatalf("idempotent create left %d runs, err %v; want one run", len(runs), err)
 	}
+	assertCounter(t, "jobs_created_total", "", createdCount+1)
+	assertCounter(t, "redis_errors_total", "", redisErrors+2)
 }
 
 func TestDispatchPublishFailureRollsBack(t *testing.T) {
+	claimed := counterValue(t, "watcher_claimed_total", "")
+	samples := metric(t, "dispatch_latency_seconds", "").GetHistogram().GetSampleCount()
 	job, err := data.CreateJob(context.Background(), store.Job{
 		Name: "dispatch-rollback-" + uuid.NewString(), Type: "handler", Payload: json.RawMessage(`{"handler":"noop"}`),
 	}, timePtr(time.Now().Add(-time.Second)))
@@ -395,6 +410,10 @@ func TestDispatchPublishFailureRollsBack(t *testing.T) {
 	run, err := data.GetRun(context.Background(), runs[0].ID)
 	if err != nil || run.Status != "PENDING" {
 		t.Fatalf("after publish failure run = %+v, %v; want PENDING", run, err)
+	}
+	assertCounter(t, "watcher_claimed_total", "", claimed)
+	if got := metric(t, "dispatch_latency_seconds", "").GetHistogram().GetSampleCount(); got != samples {
+		t.Fatalf("rolled-back dispatch added %d samples", got-samples)
 	}
 	if _, err := data.CancelRun(context.Background(), runs[0].ID); err != nil {
 		t.Fatal(err)

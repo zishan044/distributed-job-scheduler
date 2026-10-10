@@ -81,6 +81,9 @@ func (h *apiHandler) createJob(c *gin.Context) {
 				c.JSON(http.StatusOK, job)
 				return
 			}
+		} else if !errors.Is(err, redis.Nil) {
+			h.store.Metrics.RedisErrors.Inc()
+			h.logger.Warn("could not read idempotency key", "error", err)
 		}
 	}
 
@@ -105,6 +108,7 @@ func (h *apiHandler) createJob(c *gin.Context) {
 	}
 	if key != "" {
 		if err := h.redis.SetNX(c.Request.Context(), "idem:"+key, job.ID, 24*time.Hour).Err(); err != nil {
+			h.store.Metrics.RedisErrors.Inc()
 			h.logger.Warn("could not cache idempotency key", "error", err)
 		}
 	}
@@ -152,6 +156,7 @@ func (h *apiHandler) runNow(c *gin.Context) {
 		h.writeStoreError(c, err)
 		return
 	}
+	h.logger.Debug("created immediate run", "run_id", run.ID, "attempt", run.Attempt)
 	c.JSON(http.StatusCreated, run)
 }
 
@@ -176,6 +181,7 @@ func (h *apiHandler) cancelRun(c *gin.Context) {
 		h.writeStoreError(c, err)
 		return
 	}
+	h.logger.Info("run cancellation accepted", "run_id", run.ID, "attempt", run.Attempt, "status", run.Status)
 	c.JSON(http.StatusOK, run)
 }
 

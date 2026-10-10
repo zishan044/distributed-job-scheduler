@@ -110,10 +110,12 @@ func sweep(ctx context.Context, data *store.Store, dlq *kafka.Writer, logger *sl
 		if len(letters) > 0 {
 			publishCtx, stop := context.WithTimeout(ctx, options.OperationTimeout)
 			// ponytail: best-effort after commit; DB DEAD rows remain authoritative.
-			err := queue.PublishDeadLetters(publishCtx, dlq, letters...)
+			err := queue.PublishDeadLetters(publishCtx, dlq, data.Metrics.DLQ, letters...)
 			stop()
 			if err != nil {
-				logger.Error("publish recovered DEAD runs to DLQ failed", "error", err)
+				for _, letter := range letters {
+					logger.Error("publish recovered DEAD run to DLQ failed", "run_id", letter.Message.RunID, "attempt", letter.Message.Attempt, "error", err)
+				}
 			}
 		}
 		select {

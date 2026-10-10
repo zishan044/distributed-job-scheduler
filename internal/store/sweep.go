@@ -92,5 +92,9 @@ func (s *Store) Sweep(ctx context.Context, limit int, queuedTimeout time.Duratio
 	if err := tx.Commit(ctx); err != nil {
 		return SweepResult{}, err
 	}
+	s.Metrics.ZombiesRecovered.Add(float64(len(result.Recovered)))
+	for _, item := range result.Recovered {
+		s.recordOutcome(item.Run.Status)
+	}
 	return result, nil
 }

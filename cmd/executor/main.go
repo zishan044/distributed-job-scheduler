@@ -14,7 +14,6 @@ import (
 	"github.com/zishan044/distributed-job-scheduler/internal/executor"
 	"github.com/zishan044/distributed-job-scheduler/internal/httpserver"
 	"github.com/zishan044/distributed-job-scheduler/internal/logging"
-	"github.com/zishan044/distributed-job-scheduler/internal/metrics"
 	"github.com/zishan044/distributed-job-scheduler/internal/store"
 )
 
@@ -64,10 +63,9 @@ func run(logger *slog.Logger) error {
 	client := executor.HTTPClient(config.HTTPAllowedHosts())
 	defer client.CloseIdleConnections()
 
-	observations := metrics.New()
 	serveErr := make(chan error, 1)
 	go func() {
-		serveErr <- httpserver.Serve(config.HTTPAddr(), httpserver.NewRouter("executor", logger, observations.Registry), logger)
+		serveErr <- httpserver.Serve(config.HTTPAddr(), httpserver.NewRouter("executor", logger, data.Metrics.Registry), logger)
 	}()
 	consumeErr := make(chan error, 1)
 	go func() {

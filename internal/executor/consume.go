@@ -137,7 +137,7 @@ consuming:
 				continue
 			}
 			publishCtx, stop := context.WithTimeout(intakeCtx, resultTimeout)
-			publishErr := queue.PublishDeadLetters(publishCtx, dlq, queue.DeadLetter{
+			publishErr := queue.PublishDeadLetters(publishCtx, dlq, data.Metrics.DLQ, queue.DeadLetter{
 				Error:  err.Error(),
 				Source: &queue.DeadLetterSource{Topic: message.Topic, Partition: message.Partition, Offset: message.Offset, Key: message.Key, RawValue: message.Value},
 			})
@@ -182,10 +182,16 @@ consuming:
 				if errors.Is(context.Cause(owner.ctx), store.ErrLeaseLost) {
 					return
 				}
+				runLogger := logger.With("run_id", item.RunID, "attempt", item.Attempt, "worker_id", owner.id)
+				runLogger.Debug("starting job execution")
+				started := time.Now()
+				data.Metrics.InflightJobs.Inc()
 				executionErr := jobCtx.Err()
 				if executionErr == nil {
 					executionErr = Execute(jobCtx, client, item)
 				}
+				data.Metrics.ExecutionDuration.WithLabelValues(item.Type).Observe(time.Since(started).Seconds())
+				data.Metrics.InflightJobs.Dec()
 				if errors.Is(context.Cause(owner.ctx), store.ErrLeaseLost) {
 					return
 				}
@@ -202,16 +208,24 @@ consuming:
 				defer stopFence()
 				if executionErr == nil {
 					applied, err := data.SucceedRun(resultCtx, item.RunID, item.Attempt, owner.id)
-					logResult(logger, item, applied, err)
+					logResult(runLogger, applied, err)
 					return
 				}
-				logger.Warn("job execution failed", "run_id", item.RunID, "attempt", item.Attempt, "error", executionErr)
+				runLogger.Warn("job execution failed", "error", executionErr)
 				run, err := data.FailRun(resultCtx, item.RunID, item.Attempt, owner.id, classify(executionErr))
-				logResult(logger, item, run.ID != "", err)
+				logResult(runLogger, run.ID != "", err)
+				if err == nil {
+					switch run.Status {
+					case "PENDING":
+						runLogger.Info("scheduled retry", "next_attempt", run.Attempt, "scheduled_for", run.ScheduledFor)
+					case "CANCELLED":
+						runLogger.Info("run cancelled")
+					}
+				}
 				if err == nil && run.Status == "DEAD" {
 					// ponytail: best-effort after commit; add durable delivery if required.
-					if err := queue.PublishDeadLetters(resultCtx, dlq, queue.DeadLetter{Message: &item, Error: executionErr.Error()}); err != nil {
-						logger.Error("publish DEAD run to DLQ failed", "run_id", item.RunID, "attempt", item.Attempt, "error", err)
+					if err := queue.PublishDeadLetters(resultCtx, dlq, data.Metrics.DLQ, queue.DeadLetter{Message: &item, Error: executionErr.Error()}); err != nil {
+						runLogger.Error("publish DEAD run to DLQ failed", "error", err)
 					}
 				}
 			}()
@@ -230,11 +244,13 @@ func wait(ctx context.Context, delay time.Duration) error {
 	}
 }
 
-func logResult(logger *slog.Logger, item store.DispatchMessage, applied bool, err error) {
+func logResult(logger *slog.Logger, applied bool, err error) {
 	if err != nil {
-		logger.Error("save job result failed", "run_id", item.RunID, "attempt", item.Attempt, "error", err)
+		logger.Error("save job result failed", "error", err)
 	} else if !applied {
-		logger.Warn("discarded stale job completion", "run_id", item.RunID, "attempt", item.Attempt)
+		logger.Warn("discarded stale job completion")
+	} else {
+		logger.Debug("saved job result")
 	}
 }
 

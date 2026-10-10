@@ -160,6 +160,11 @@ func TestLeaseFencingAfterRunLockWait(t *testing.T) {
 }
 
 func TestConcurrentSweepIsBoundedAndSkipsLockedRuns(t *testing.T) {
+	zombies := counterValue(t, "zombies_recovered_total", "")
+	retries := counterValue(t, "retries_total", "")
+	failed := counterValue(t, "executions_total", "failed")
+	dead := counterValue(t, "executions_total", "dead")
+	cancelled := counterValue(t, "executions_total", "cancelled")
 	crashed := registeredWorker(t, time.Minute)
 	expected := make(map[string]string)
 	var held store.DispatchMessage
@@ -253,6 +258,11 @@ func TestConcurrentSweepIsBoundedAndSkipsLockedRuns(t *testing.T) {
 	if ok, err := data.SucceedRun(context.Background(), liveMessage.RunID, 1, liveWorker); err != nil || !ok {
 		t.Fatalf("live run completion = %v, %v", ok, err)
 	}
+	assertCounter(t, "zombies_recovered_total", "", zombies+5)
+	assertCounter(t, "retries_total", "", retries+3)
+	assertCounter(t, "executions_total", "failed", failed+3)
+	assertCounter(t, "executions_total", "dead", dead+1)
+	assertCounter(t, "executions_total", "cancelled", cancelled+1)
 }
 
 func TestStuckQueuedSweepPreservesAttemptAndStartGate(t *testing.T) {
@@ -323,6 +333,7 @@ func startWatcher(t *testing.T, writer, dlq *kafka.Writer, options watcher.Optio
 }
 
 func TestWorkerHeartbeatsWhilePoolIsFull(t *testing.T) {
+	durations := metric(t, "execution_duration_seconds", "http").GetHistogram().GetSampleCount()
 	entered, release := make(chan struct{}), make(chan struct{})
 	releaseJob := sync.OnceFunc(func() { close(release) })
 	defer releaseJob()
@@ -349,6 +360,9 @@ func TestWorkerHeartbeatsWhilePoolIsFull(t *testing.T) {
 		t.Fatal("HTTP execution did not start")
 	}
 	run := waitForRun(t, message.RunID, "RUNNING")
+	if got := metric(t, "inflight_jobs", "").GetGauge().GetValue(); got != 1 {
+		t.Fatalf("inflight jobs = %v, want 1 while handler is blocked", got)
+	}
 	var before time.Time
 	if err := database.QueryRow(`SELECT last_heartbeat FROM workers WHERE id::text=$1`, run.WorkerID).Scan(&before); err != nil {
 		t.Fatal(err)
@@ -365,6 +379,12 @@ func TestWorkerHeartbeatsWhilePoolIsFull(t *testing.T) {
 	}
 	releaseJob()
 	waitForRun(t, message.RunID, "SUCCEEDED")
+	if got := metric(t, "inflight_jobs", "").GetGauge().GetValue(); got != 0 {
+		t.Fatalf("inflight jobs = %v, want 0 after execution (even while fetching)", got)
+	}
+	if got := metric(t, "execution_duration_seconds", "http").GetHistogram().GetSampleCount(); got != durations+1 {
+		t.Fatalf("execution samples = %d, want %d", got, durations+1)
+	}
 }
 
 func TestWorkerSelfFencesDuringBlockedHeartbeatAndResumes(t *testing.T) {

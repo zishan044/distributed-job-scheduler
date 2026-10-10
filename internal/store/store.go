@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/zishan044/distributed-job-scheduler/internal/metrics"
 )
 
 var (
@@ -20,7 +21,8 @@ var (
 )
 
 type Store struct {
-	pool *pgxpool.Pool
+	pool    *pgxpool.Pool
+	Metrics *metrics.Metrics
 }
 
 func New(ctx context.Context, databaseURL string) (*Store, error) {
@@ -32,7 +34,7 @@ func New(ctx context.Context, databaseURL string) (*Store, error) {
 		pool.Close()
 		return nil, fmt.Errorf("connect to postgres: %w", err)
 	}
-	return &Store{pool: pool}, nil
+	return &Store{pool: pool, Metrics: metrics.New()}, nil
 }
 
 func (s *Store) Close() {
@@ -242,6 +244,7 @@ func (s *Store) CreateJob(ctx context.Context, job Job, firstRunAt *time.Time) (
 	if err := tx.Commit(ctx); err != nil {
 		return Job{}, err
 	}
+	s.Metrics.JobsCreated.Inc()
 	return created, nil
 }
 
@@ -416,17 +419,26 @@ func (s *Store) DispatchDue(ctx context.Context, limit int, publish func([]Dispa
 	if err := publish(messages); err != nil {
 		return 0, err
 	}
+	latencies := make([]float64, 0, len(messages))
 	for _, message := range messages {
 		id, err := parseUUID(message.RunID)
 		if err != nil {
 			return 0, err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE job_runs SET status='QUEUED', queued_at=now() WHERE id=$1 AND status='PENDING'`, id); err != nil {
+		var latency float64
+		if err := tx.QueryRow(ctx, `UPDATE job_runs SET status='QUEUED', queued_at=clock_timestamp()
+			WHERE id=$1 AND status='PENDING'
+			RETURNING EXTRACT(EPOCH FROM (queued_at-scheduled_for))::double precision`, id).Scan(&latency); err != nil {
 			return 0, err
 		}
+		latencies = append(latencies, latency)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return 0, err
+	}
+	s.Metrics.WatcherClaimed.Add(float64(len(messages)))
+	for _, latency := range latencies {
+		s.Metrics.DispatchLatency.Observe(max(0, latency))
 	}
 	return len(messages), nil
 }
@@ -463,27 +475,28 @@ func (s *Store) StartRuns(ctx context.Context, messages []DispatchMessage, worke
 	}
 	batch := &pgx.Batch{}
 	for i, message := range messages {
-		batch.Queue(`UPDATE job_runs SET status='RUNNING', worker_id=$3, started_at=now()
+		batch.Queue(`UPDATE job_runs SET status='RUNNING', worker_id=$3, started_at=clock_timestamp()
 			WHERE id=$1 AND attempt=$2 AND status='QUEUED'
 			AND EXISTS (SELECT 1 FROM workers WHERE id=$3 AND lease_expires_at > clock_timestamp())
-			RETURNING started_at`, ids[i], message.Attempt, worker)
+			RETURNING started_at, EXTRACT(EPOCH FROM (started_at-scheduled_for))::double precision`, ids[i], message.Attempt, worker)
 	}
 	results := tx.SendBatch(ctx, batch)
 	type startedRun struct {
 		message DispatchMessage
 		at      time.Time
+		latency float64
 	}
 	started := make([]startedRun, 0, len(messages))
 	for _, message := range messages {
-		var at time.Time
-		if err := results.QueryRow().Scan(&at); err != nil {
+		item := startedRun{message: message}
+		if err := results.QueryRow().Scan(&item.at, &item.latency); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				continue
 			}
 			_ = results.Close()
 			return nil, err
 		}
-		started = append(started, startedRun{message: message, at: at})
+		started = append(started, item)
 	}
 	if err := results.Close(); err != nil {
 		return nil, err
@@ -503,6 +516,9 @@ func (s *Store) StartRuns(ctx context.Context, messages []DispatchMessage, worke
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
+	}
+	for _, item := range started {
+		s.Metrics.StartLatency.Observe(max(0, item.latency))
 	}
 	return claimed, nil
 }
@@ -542,6 +558,7 @@ func (s *Store) SucceedRun(ctx context.Context, id string, attempt int, workerID
 		RETURNING status
 	`, dbID, attempt, dbWorkerID).Scan(&outcome)
 	if errors.Is(err, pgx.ErrNoRows) {
+		s.Metrics.StaleCompletions.Inc()
 		return false, nil
 	}
 	if err != nil {
@@ -553,6 +570,7 @@ func (s *Store) SucceedRun(ctx context.Context, id string, attempt int, workerID
 	if err := tx.Commit(ctx); err != nil {
 		return false, err
 	}
+	s.recordOutcome(outcome)
 	return true, nil
 }
 

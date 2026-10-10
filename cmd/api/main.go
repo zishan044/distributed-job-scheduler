@@ -9,7 +9,6 @@ import (
 	"github.com/zishan044/distributed-job-scheduler/internal/config"
 	"github.com/zishan044/distributed-job-scheduler/internal/httpserver"
 	"github.com/zishan044/distributed-job-scheduler/internal/logging"
-	"github.com/zishan044/distributed-job-scheduler/internal/metrics"
 	"github.com/zishan044/distributed-job-scheduler/internal/store"
 )
 
@@ -41,6 +40,5 @@ func run(logger *slog.Logger) error {
 	cache := redis.NewClient(&redis.Options{Addr: config.RedisAddr()})
 	defer cache.Close()
 
-	observations := metrics.New()
-	return httpserver.Serve(config.HTTPAddr(), httpserver.NewAPIRouter(logger, data, cache, apiKey, observations.Registry), logger)
+	return httpserver.Serve(config.HTTPAddr(), httpserver.NewAPIRouter(logger, data, cache, apiKey, data.Metrics.Registry), logger)
 }

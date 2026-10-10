@@ -3,8 +3,10 @@ package queue
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/segmentio/kafka-go"
 	"github.com/zishan044/distributed-job-scheduler/internal/store"
 )
@@ -24,7 +26,7 @@ type DeadLetterSource struct {
 	RawValue  []byte `json:"raw_value"` // Base64 preserves malformed JSON and invalid UTF-8.
 }
 
-func PublishDeadLetters(ctx context.Context, writer *kafka.Writer, letters ...DeadLetter) error {
+func PublishDeadLetters(ctx context.Context, writer *kafka.Writer, counter prometheus.Counter, letters ...DeadLetter) error {
 	if len(letters) == 0 {
 		return nil
 	}
@@ -44,5 +46,24 @@ func PublishDeadLetters(ctx context.Context, writer *kafka.Writer, letters ...De
 		}
 		messages = append(messages, kafka.Message{Key: key, Value: value})
 	}
-	return writer.WriteMessages(ctx, messages...)
+	err := writer.WriteMessages(ctx, messages...)
+	counter.Add(float64(acknowledgedMessages(len(messages), err)))
+	return err
+}
+
+func acknowledgedMessages(count int, err error) int {
+	if err == nil {
+		return count
+	}
+	var failures kafka.WriteErrors
+	if !errors.As(err, &failures) {
+		return 0 // Cancellation and connection errors leave acknowledgement unknown.
+	}
+	acknowledged := 0
+	for _, failure := range failures {
+		if failure == nil {
+			acknowledged++
+		}
+	}
+	return acknowledged
 }

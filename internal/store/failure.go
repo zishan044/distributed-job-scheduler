@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -34,13 +35,27 @@ func (s *Store) FailRun(ctx context.Context, id string, attempt int, workerID st
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	run, err := failRun(ctx, tx, runID, attempt, worker, failure, false)
-	if err != nil || run.ID == "" {
+	if err != nil {
 		return run, err
+	}
+	if run.ID == "" {
+		s.Metrics.StaleCompletions.Inc()
+		return run, nil
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return Run{}, err
 	}
+	s.recordOutcome(run.Status)
 	return run, nil
+}
+
+// recordOutcome is called only after the enclosing transaction commits.
+func (s *Store) recordOutcome(status string) {
+	if status == "PENDING" {
+		s.Metrics.Retries.Inc()
+		status = "FAILED"
+	}
+	s.Metrics.Executions.WithLabelValues(strings.ToLower(status)).Inc()
 }
 
 // recovery requires an expired/missing worker; execution requires a live worker.
