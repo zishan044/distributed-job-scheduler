@@ -13,6 +13,7 @@ import (
 	"github.com/zishan044/distributed-job-scheduler/internal/config"
 	"github.com/zishan044/distributed-job-scheduler/internal/httpserver"
 	"github.com/zishan044/distributed-job-scheduler/internal/logging"
+	"github.com/zishan044/distributed-job-scheduler/internal/metrics"
 	"github.com/zishan044/distributed-job-scheduler/internal/store"
 	"github.com/zishan044/distributed-job-scheduler/internal/watcher"
 )
@@ -57,9 +58,10 @@ func run(logger *slog.Logger) error {
 	}
 	defer dlq.Close()
 
+	observations := metrics.New()
 	serveErr := make(chan error, 1)
 	go func() {
-		serveErr <- httpserver.Serve(config.HTTPAddr(), httpserver.NewRouter("watcher", logger), logger)
+		serveErr <- httpserver.Serve(config.HTTPAddr(), httpserver.NewRouter("watcher", logger, observations.Registry), logger)
 	}()
 	watchErr := make(chan error, 1)
 	go func() { watchErr <- watcher.Run(ctx, data, writer, dlq, logger, watcher.DefaultOptions()) }()

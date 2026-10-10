@@ -29,6 +29,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 	executorlib "github.com/zishan044/distributed-job-scheduler/internal/executor"
 	"github.com/zishan044/distributed-job-scheduler/internal/httpserver"
+	"github.com/zishan044/distributed-job-scheduler/internal/metrics"
 	"github.com/zishan044/distributed-job-scheduler/internal/store"
 	"github.com/zishan044/distributed-job-scheduler/internal/store/migrations"
 )
@@ -129,7 +130,7 @@ func run(m *testing.M) int {
 	if err != nil {
 		return setupFailure("get kafka brokers", err)
 	}
-	api = httpserver.NewAPIRouter(logger, data, cache, apiKey)
+	api = httpserver.NewAPIRouter(logger, data, cache, apiKey, metrics.New().Registry)
 
 	return m.Run()
 }
@@ -358,7 +359,7 @@ func TestCreateIdempotencyUsesRedisAndDatabaseFallback(t *testing.T) {
 		WriteTimeout: 100 * time.Millisecond,
 	})
 	defer unavailable.Close()
-	fallbackAPI := httpserver.NewAPIRouter(logger, data, unavailable, apiKey)
+	fallbackAPI := httpserver.NewAPIRouter(logger, data, unavailable, apiKey, metrics.New().Registry)
 	fallback := perform(fallbackAPI, http.MethodPost, "/v1/jobs", body, apiKey, key)
 	if fallback.Code != http.StatusCreated {
 		t.Fatalf("database fallback status = %d, body %s", fallback.Code, fallback.Body.String())

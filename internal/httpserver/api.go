@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
 	"github.com/zishan044/distributed-job-scheduler/internal/store"
 )
@@ -38,8 +39,8 @@ type createJobRequest struct {
 	ScheduledFor  *time.Time      `json:"scheduled_for"`
 }
 
-func NewAPIRouter(logger *slog.Logger, data *store.Store, cache *redis.Client, apiKey string) *gin.Engine {
-	router := NewRouter("api", logger)
+func NewAPIRouter(logger *slog.Logger, data *store.Store, cache *redis.Client, apiKey string, registry prometheus.Gatherer) *gin.Engine {
+	router := NewRouter("api", logger, registry)
 	handler := &apiHandler{logger: logger, store: data, redis: cache}
 	v1 := router.Group("/v1", requireAPIKey(apiKey))
 	v1.POST("/jobs", handler.createJob)

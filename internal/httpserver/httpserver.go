@@ -11,15 +11,18 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-func NewRouter(service string, logger *slog.Logger) *gin.Engine {
+func NewRouter(service string, logger *slog.Logger, registry prometheus.Gatherer) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(gin.RecoveryWithWriter(logWriter{logger: logger}), requestLogger(logger))
 	router.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"service": service, "status": "ok"})
 	})
+	router.GET("/metrics", gin.WrapH(promhttp.HandlerFor(registry, promhttp.HandlerOpts{})))
 	return router
 }
 
