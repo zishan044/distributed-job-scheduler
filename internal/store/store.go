@@ -34,7 +34,9 @@ func New(ctx context.Context, databaseURL string) (*Store, error) {
 		pool.Close()
 		return nil, fmt.Errorf("connect to postgres: %w", err)
 	}
-	return &Store{pool: pool, Metrics: metrics.New()}, nil
+	observations := metrics.New()
+	observations.RegisterPool(pool)
+	return &Store{pool: pool, Metrics: observations}, nil
 }
 
 func (s *Store) Close() {

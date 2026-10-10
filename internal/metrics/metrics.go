@@ -12,8 +12,6 @@ type Metrics struct {
 	StartLatency      prometheus.Histogram
 	ExecutionDuration *prometheus.HistogramVec
 	InflightJobs      prometheus.Gauge
-	ActiveWorkers     prometheus.Gauge
-	KafkaConsumerLag  prometheus.Gauge
 	Retries           prometheus.Counter
 	DLQ               prometheus.Counter
 	ZombiesRecovered  prometheus.Counter
@@ -48,12 +46,6 @@ func New() *Metrics {
 		}, []string{"type"}),
 		InflightJobs: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "inflight_jobs", Help: "Jobs currently executing in this process, excluding reserved fetch slots.",
-		}),
-		ActiveWorkers: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "active_workers", Help: "Workers with live database leases across the cluster.",
-		}),
-		KafkaConsumerLag: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "kafka_consumer_lag", Help: "Messages in jobs.run awaiting committed offsets for the executors consumer group.",
 		}),
 		Retries: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "retries_total", Help: "Committed transitions that schedule a new execution attempt, including zombie recovery.",

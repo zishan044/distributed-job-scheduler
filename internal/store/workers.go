@@ -22,6 +22,12 @@ type Heartbeat struct {
 	Cancellations []Cancellation
 }
 
+func (s *Store) ActiveWorkers(ctx context.Context) (int64, error) {
+	var count int64
+	err := s.pool.QueryRow(ctx, `SELECT count(*) FROM workers WHERE lease_expires_at > clock_timestamp()`).Scan(&count)
+	return count, err
+}
+
 // RegisterWorker requires a new ID: expired identities must never be reused.
 func (s *Store) RegisterWorker(ctx context.Context, id, hostname string, capacity int, lease time.Duration) error {
 	worker, err := parseUUID(id)
