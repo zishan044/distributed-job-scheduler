@@ -49,6 +49,54 @@ func TestReliabilityHandlers(t *testing.T) {
 	}
 }
 
+func TestRegisteredHandlerDispatch(t *testing.T) {
+	message := store.DispatchMessage{Type: "handler", Payload: json.RawMessage(`{"handler":"custom","duration_ms":"custom schema","error":false,"permanent":42}`), TimeoutMS: 20}
+	called := false
+	handlers := map[string]func(context.Context, store.DispatchMessage) error{
+		"custom": func(ctx context.Context, got store.DispatchMessage) error {
+			called = true
+			if string(got.Payload) != string(message.Payload) {
+				t.Fatal("custom payload changed")
+			}
+			if _, ok := ctx.Deadline(); !ok {
+				t.Fatal("custom handler has no timeout")
+			}
+			<-ctx.Done()
+			return ctx.Err()
+		},
+	}
+	if err := execute(context.Background(), nil, message, handlers); !errors.Is(err, context.DeadlineExceeded) || classify(err).Permanent || !called {
+		t.Fatalf("custom timeout = %v, called %v", err, called)
+	}
+	ctx, stop := context.WithCancel(context.Background())
+	stop()
+	called = false
+	if err := execute(ctx, nil, message, handlers); !errors.Is(err, context.Canceled) || called {
+		t.Fatalf("cancelled execution = %v, called %v", err, called)
+	}
+	ctx, stop = context.WithCancel(context.Background())
+	handlers["custom"] = func(ctx context.Context, _ store.DispatchMessage) error {
+		stop()
+		<-ctx.Done()
+		return ctx.Err()
+	}
+	if err := execute(ctx, nil, message, handlers); !errors.Is(err, context.Canceled) {
+		t.Fatalf("in-flight cancellation = %v", err)
+	}
+	sentinel := errors.New("stop retrying")
+	handlers["custom"] = func(context.Context, store.DispatchMessage) error {
+		return fmt.Errorf("outer: %w", Permanent(sentinel))
+	}
+	if err := execute(context.Background(), nil, message, handlers); !errors.Is(err, sentinel) || !classify(err).Permanent {
+		t.Fatalf("wrapped permanent failure = %v", err)
+	}
+	message.Payload = json.RawMessage(`{"handler":"noop"}`)
+	handlers["noop"] = func(context.Context, store.DispatchMessage) error { t.Fatal("builtin overridden"); return nil }
+	if err := execute(context.Background(), nil, message, handlers); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestExecutionFailureClassification(t *testing.T) {
 	for _, status := range []int{200, 204, 301, 400, 401, 403, 404, 408, 409, 429, 500, 503, 599, 600} {
 		t.Run(http.StatusText(status), func(t *testing.T) {

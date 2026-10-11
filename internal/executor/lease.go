@@ -18,6 +18,8 @@ type Options struct {
 	LeaseDuration     time.Duration
 	SafetyMargin      time.Duration
 	DrainTimeout      time.Duration
+	// Handlers is immutable during Consume. Built-in names are reserved.
+	Handlers map[string]func(context.Context, store.DispatchMessage) error
 }
 
 func DefaultOptions(concurrency int) Options {

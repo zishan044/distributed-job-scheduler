@@ -7,14 +7,10 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
-	"github.com/segmentio/kafka-go"
 	"github.com/zishan044/distributed-job-scheduler/internal/config"
-	"github.com/zishan044/distributed-job-scheduler/internal/executor"
-	"github.com/zishan044/distributed-job-scheduler/internal/httpserver"
 	"github.com/zishan044/distributed-job-scheduler/internal/logging"
-	"github.com/zishan044/distributed-job-scheduler/internal/store"
+	"github.com/zishan044/distributed-job-scheduler/pkg/worker"
 )
 
 func main() {
@@ -41,45 +37,15 @@ func run(logger *slog.Logger) error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	data, err := store.New(ctx, databaseURL)
+	instance, err := worker.New(worker.Config{
+		DatabaseURL: databaseURL, KafkaBrokers: brokers, Concurrency: concurrency,
+		HTTPAllowedHosts: config.HTTPAllowedHosts(), HTTPAddr: config.HTTPAddr(), Logger: logger,
+	})
 	if err != nil {
 		return err
 	}
-	defer data.Close()
-	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers:        brokers,
-		Topic:          "jobs.run",
-		GroupID:        "executors",
-		CommitInterval: 0,
-	})
-	defer reader.Close()
-	dlq := &kafka.Writer{
-		Addr: kafka.TCP(brokers...), Topic: "jobs.dlq", Balancer: &kafka.Hash{},
-		RequiredAcks: kafka.RequireAll, BatchTimeout: 5 * time.Millisecond,
-		// Bound background delivery too: Close waits for writer retries.
-		MaxAttempts: 1, ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second,
-	}
-	defer dlq.Close()
-	client := executor.HTTPClient(config.HTTPAllowedHosts())
-	defer client.CloseIdleConnections()
-
-	serveErr := make(chan error, 1)
-	go func() {
-		serveErr <- httpserver.Serve(config.HTTPAddr(), httpserver.NewRouter("executor", logger, data.Metrics.Registry), logger)
-	}()
-	consumeErr := make(chan error, 1)
-	go func() {
-		consumeErr <- executor.Consume(ctx, reader, data, client, dlq, logger, executor.DefaultOptions(concurrency))
-	}()
-	select {
-	case err := <-serveErr:
-		stop()
-		<-consumeErr
+	if err := instance.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		return err
-	case err := <-consumeErr:
-		if err != nil && !errors.Is(err, context.Canceled) {
-			return err
-		}
-		return nil
 	}
+	return nil
 }

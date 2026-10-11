@@ -27,14 +27,22 @@ func NewRouter(service string, logger *slog.Logger, registry prometheus.Gatherer
 }
 
 func Serve(addr string, handler http.Handler, logger *slog.Logger) error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return ServeContext(ctx, addr, handler, logger)
+}
+
+// ServeContext serves until ctx is cancelled, then closes the listener and
+// drains requests for up to ten seconds. It joins the serving goroutine.
+func ServeContext(ctx context.Context, addr string, handler http.Handler, logger *slog.Logger) error {
+	if ctx.Err() != nil {
+		return nil
+	}
 	server := &http.Server{
 		Addr:              addr,
 		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	serveErr := make(chan error, 1)
 	go func() {
@@ -53,10 +61,13 @@ func Serve(addr string, handler http.Handler, logger *slog.Logger) error {
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		return err
+	err := server.Shutdown(shutdownCtx)
+	if err != nil {
+		// Shutdown does not close active connections when its deadline expires.
+		err = errors.Join(err, server.Close())
 	}
-	return nil
+	<-serveErr
+	return err
 }
 
 func requestLogger(logger *slog.Logger) gin.HandlerFunc {

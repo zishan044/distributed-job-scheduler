@@ -188,7 +188,7 @@ consuming:
 				data.Metrics.InflightJobs.Inc()
 				executionErr := jobCtx.Err()
 				if executionErr == nil {
-					executionErr = Execute(jobCtx, client, item)
+					executionErr = execute(jobCtx, client, item, options.Handlers)
 				}
 				data.Metrics.ExecutionDuration.WithLabelValues(item.Type).Observe(time.Since(started).Seconds())
 				data.Metrics.InflightJobs.Dec()

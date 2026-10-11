@@ -18,7 +18,15 @@ type permanentError struct{ error }
 
 func (e permanentError) Unwrap() error { return e.error }
 
-func permanent(err error) error { return permanentError{err} }
+// Permanent marks an execution error as non-retryable.
+func Permanent(err error) error {
+	if err == nil {
+		return nil
+	}
+	return permanentError{err}
+}
+
+func permanent(err error) error { return Permanent(err) }
 
 func classify(err error) store.Failure {
 	var target permanentError
@@ -31,6 +39,10 @@ func classify(err error) store.Failure {
 }
 
 func Execute(ctx context.Context, client *http.Client, message store.DispatchMessage) error {
+	return execute(ctx, client, message, nil)
+}
+
+func execute(ctx context.Context, client *http.Client, message store.DispatchMessage, handlers map[string]func(context.Context, store.DispatchMessage) error) error {
 	if message.TimeoutMS > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, time.Duration(message.TimeoutMS)*time.Millisecond)
@@ -41,6 +53,18 @@ func Execute(ctx context.Context, client *http.Client, message store.DispatchMes
 	}
 	switch message.Type {
 	case "handler":
+		var selector struct {
+			Handler string `json:"handler"`
+		}
+		if err := json.Unmarshal(message.Payload, &selector); err != nil {
+			return permanent(fmt.Errorf("decode handler payload: %w", err))
+		}
+		if selector.Handler != "noop" && selector.Handler != "sleep" && selector.Handler != "fail" {
+			if handler := handlers[selector.Handler]; handler != nil {
+				return handler(ctx, message)
+			}
+			return permanent(fmt.Errorf("unknown handler %q", selector.Handler))
+		}
 		var payload struct {
 			Handler    string `json:"handler"`
 			DurationMS int64  `json:"duration_ms"`
