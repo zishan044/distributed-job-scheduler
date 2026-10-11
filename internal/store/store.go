@@ -12,12 +12,14 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/zishan044/distributed-job-scheduler/internal/metrics"
+	"github.com/zishan044/distributed-job-scheduler/pkg/api"
 )
 
 var (
-	ErrNotFound          = errors.New("store: not found")
-	ErrInvalidTransition = errors.New("store: invalid state transition")
-	ErrInvalidJob        = errors.New("store: invalid job")
+	ErrNotFound            = errors.New("store: not found")
+	ErrInvalidTransition   = errors.New("store: invalid state transition")
+	ErrInvalidJob          = errors.New("store: invalid job")
+	ErrIdempotencyConflict = errors.New("store: idempotency key reused with a different batch")
 )
 
 type Store struct {
@@ -43,40 +45,9 @@ func (s *Store) Close() {
 	s.pool.Close()
 }
 
-type Job struct {
-	ID             string          `json:"id"`
-	Name           string          `json:"name"`
-	Type           string          `json:"type"`
-	Payload        json.RawMessage `json:"payload"`
-	CronExpr       string          `json:"cron_expr,omitempty"`
-	Timezone       string          `json:"timezone"`
-	NextFireAt     *time.Time      `json:"next_fire_at,omitempty"`
-	MisfirePolicy  string          `json:"misfire_policy"`
-	Paused         bool            `json:"paused"`
-	MaxAttempts    int             `json:"max_attempts"`
-	BackoffBaseMS  int             `json:"backoff_base_ms"`
-	BackoffMaxMS   int             `json:"backoff_max_ms"`
-	TimeoutMS      int             `json:"timeout_ms"`
-	IdempotencyKey string          `json:"-"`
-	CreatedAt      time.Time       `json:"created_at"`
-	DeletedAt      *time.Time      `json:"deleted_at,omitempty"`
-}
+type Job = api.Job
 
-type Run struct {
-	ID              string     `json:"id"`
-	JobID           string     `json:"job_id"`
-	FireTime        time.Time  `json:"fire_time"`
-	ScheduledFor    time.Time  `json:"scheduled_for"`
-	Status          string     `json:"status"`
-	Attempt         int        `json:"attempt"`
-	WorkerID        string     `json:"worker_id,omitempty"`
-	QueuedAt        *time.Time `json:"queued_at,omitempty"`
-	StartedAt       *time.Time `json:"started_at,omitempty"`
-	FinishedAt      *time.Time `json:"finished_at,omitempty"`
-	LastError       string     `json:"last_error,omitempty"`
-	CancelRequested bool       `json:"cancel_requested"`
-	RetryOf         string     `json:"retry_of,omitempty"`
-}
+type Run = api.Run
 
 type DispatchMessage struct {
 	RunID     string          `json:"run_id"`
@@ -156,7 +127,8 @@ func scanRun(row rowScanner) (Run, error) {
 	return run, nil
 }
 
-func (s *Store) CreateJob(ctx context.Context, job Job, firstRunAt *time.Time) (Job, error) {
+// prepareJob keeps create validation and defaults identical for singles and batches.
+func prepareJob(job Job, firstRunAt *time.Time) (Job, error) {
 	if !json.Valid(job.Payload) || job.Name == "" || (job.Type != "http" && job.Type != "handler") {
 		return Job{}, ErrInvalidJob
 	}
@@ -164,10 +136,6 @@ func (s *Store) CreateJob(ctx context.Context, job Job, firstRunAt *time.Time) (
 		return Job{}, fmt.Errorf("%w: one-shot jobs need a fire time and cron jobs must not have one", ErrInvalidJob)
 	}
 
-	id, err := uuid.NewV7()
-	if err != nil {
-		return Job{}, fmt.Errorf("generate job id: %w", err)
-	}
 	if job.Timezone == "" {
 		job.Timezone = "UTC"
 	}
@@ -188,6 +156,18 @@ func (s *Store) CreateJob(ctx context.Context, job Job, firstRunAt *time.Time) (
 	}
 	if job.MaxAttempts < 1 || job.BackoffBaseMS < 1 || job.BackoffMaxMS < job.BackoffBaseMS || job.TimeoutMS < 1 {
 		return Job{}, ErrInvalidJob
+	}
+	return job, nil
+}
+
+func (s *Store) CreateJob(ctx context.Context, job Job, firstRunAt *time.Time) (Job, error) {
+	job, err := prepareJob(job, firstRunAt)
+	if err != nil {
+		return Job{}, err
+	}
+	id, err := uuid.NewV7()
+	if err != nil {
+		return Job{}, fmt.Errorf("generate job id: %w", err)
 	}
 
 	tx, err := s.pool.Begin(ctx)

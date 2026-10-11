@@ -9,14 +9,10 @@ import (
 	"time"
 
 	"github.com/zishan044/distributed-job-scheduler/internal/store"
+	"github.com/zishan044/distributed-job-scheduler/pkg/api"
 )
 
-type httpPayload struct {
-	URL     string            `json:"url"`
-	Method  string            `json:"method"`
-	Headers map[string]string `json:"headers"`
-	Body    string            `json:"body"`
-}
+type httpPayload = api.HTTPPayload
 
 type permanentError struct{ error }
 

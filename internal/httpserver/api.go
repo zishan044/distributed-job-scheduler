@@ -2,7 +2,6 @@ package httpserver
 
 import (
 	"crypto/subtle"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -15,6 +14,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
 	"github.com/zishan044/distributed-job-scheduler/internal/store"
+	"github.com/zishan044/distributed-job-scheduler/pkg/api"
 )
 
 type apiHandler struct {
@@ -23,27 +23,12 @@ type apiHandler struct {
 	redis  *redis.Client
 }
 
-type createJobRequest struct {
-	Name          string          `json:"name"`
-	Type          string          `json:"type"`
-	Payload       json.RawMessage `json:"payload"`
-	CronExpr      string          `json:"cron_expr"`
-	Timezone      string          `json:"timezone"`
-	NextFireAt    *time.Time      `json:"next_fire_at"`
-	MisfirePolicy string          `json:"misfire_policy"`
-	Paused        bool            `json:"paused"`
-	MaxAttempts   int             `json:"max_attempts"`
-	BackoffBaseMS int             `json:"backoff_base_ms"`
-	BackoffMaxMS  int             `json:"backoff_max_ms"`
-	TimeoutMS     int             `json:"timeout_ms"`
-	ScheduledFor  *time.Time      `json:"scheduled_for"`
-}
-
 func NewAPIRouter(logger *slog.Logger, data *store.Store, cache *redis.Client, apiKey string, registry prometheus.Gatherer) *gin.Engine {
 	router := NewRouter("api", logger, registry)
 	handler := &apiHandler{logger: logger, store: data, redis: cache}
 	v1 := router.Group("/v1", requireAPIKey(apiKey))
 	v1.POST("/jobs", handler.createJob)
+	v1.POST("/jobs/batch", handler.createBatch)
 	v1.GET("/jobs/:id", handler.getJob)
 	v1.GET("/jobs/:id/runs", handler.listJobRuns)
 	v1.POST("/jobs/:id/run-now", handler.runNow)
@@ -61,7 +46,7 @@ func requireAPIKey(apiKey string) gin.HandlerFunc {
 			provided = strings.TrimSpace(strings.TrimPrefix(authorization, prefix))
 		}
 		if apiKey == "" || subtle.ConstantTimeCompare([]byte(provided), []byte(apiKey)) != 1 {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, api.ErrorResponse{Error: "unauthorized"})
 			return
 		}
 		c.Next()
@@ -69,9 +54,9 @@ func requireAPIKey(apiKey string) gin.HandlerFunc {
 }
 
 func (h *apiHandler) createJob(c *gin.Context) {
-	var request createJobRequest
+	var request api.CreateJobRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON body"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "invalid JSON body"})
 		return
 	}
 	key := strings.TrimSpace(c.GetHeader("Idempotency-Key"))
@@ -113,6 +98,25 @@ func (h *apiHandler) createJob(c *gin.Context) {
 		}
 	}
 	c.JSON(http.StatusCreated, job)
+}
+
+func (h *apiHandler) createBatch(c *gin.Context) {
+	var request api.CreateBatchRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "invalid JSON body"})
+		return
+	}
+	jobs, replay, err := h.store.CreateJobs(c.Request.Context(), request.Jobs,
+		strings.TrimSpace(c.GetHeader("Idempotency-Key")))
+	if err != nil {
+		h.writeStoreError(c, err)
+		return
+	}
+	status := http.StatusCreated
+	if replay {
+		status = http.StatusOK
+	}
+	c.JSON(status, jobs)
 }
 
 func (h *apiHandler) getJob(c *gin.Context) {
@@ -187,7 +191,7 @@ func (h *apiHandler) cancelRun(c *gin.Context) {
 
 func validPathID(c *gin.Context) bool {
 	if _, err := uuid.Parse(c.Param("id")); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "invalid id"})
 		return false
 	}
 	return true
@@ -203,7 +207,7 @@ func runListBounds(c *gin.Context) (int, int, bool) {
 		offset, err = strconv.Atoi(c.Query("offset"))
 	}
 	if err != nil || limit < 1 || limit > 100 || offset < 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "limit must be 1-100 and offset must be non-negative"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "limit must be 1-100 and offset must be non-negative"})
 		return 0, 0, false
 	}
 	return limit, offset, true
@@ -212,13 +216,15 @@ func runListBounds(c *gin.Context) (int, int, bool) {
 func (h *apiHandler) writeStoreError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		c.JSON(http.StatusNotFound, api.ErrorResponse{Error: "not found"})
 	case errors.Is(err, store.ErrInvalidJob):
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid job"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "invalid job"})
+	case errors.Is(err, store.ErrIdempotencyConflict):
+		c.JSON(http.StatusConflict, api.ErrorResponse{Error: "idempotency key reused with a different batch"})
 	case errors.Is(err, store.ErrInvalidTransition):
-		c.JSON(http.StatusConflict, gin.H{"error": "invalid state transition"})
+		c.JSON(http.StatusConflict, api.ErrorResponse{Error: "invalid state transition"})
 	default:
 		h.logger.Error("API storage operation failed", "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "internal server error"})
 	}
 }
