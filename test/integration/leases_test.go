@@ -625,4 +625,21 @@ func TestWatcherSweepsWhileKafkaPublishIsBlocked(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	cron := dueCronJob(t, "fire_once", databaseNow(t).Add(-time.Minute))
+	cronCtx, stopCron := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer stopCron()
+	if err := waitFor(cronCtx, func() error {
+		var exists bool
+		if err := database.QueryRowContext(cronCtx, `SELECT EXISTS (
+			SELECT 1 FROM job_runs WHERE job_id::text=$1 AND fire_time=$2 AND status='PENDING'
+		)`, cron.ID, cron.NextFireAt).Scan(&exists); err != nil {
+			return err
+		}
+		if !exists {
+			return fmt.Errorf("cron materialization was blocked by Kafka")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
 }

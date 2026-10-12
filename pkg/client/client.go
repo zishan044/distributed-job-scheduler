@@ -2,7 +2,7 @@
 //
 // Schedule methods return job definitions. Use ListRuns to obtain an initial
 // run ID before calling Wait; RunNow returns a run directly. Cron execution
-// requires the server's cron materializer (M6).
+// is materialized by the watcher using the job's misfire policy.
 //
 // Creates generate an idempotency key per call and reuse it on automatic
 // retries. Supply WithIdempotencyKey to replay a create across separate calls.

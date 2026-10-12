@@ -24,7 +24,7 @@ const (
 // CreateJobRequest describes a job and, for a one-shot job, its first run time.
 // Cron jobs use five-field expressions and an IANA timezone (default UTC).
 // NextFireAt overrides the first fire; otherwise the server computes it from
-// database time. Cron execution requires the server's materializer.
+// database time. The watcher materializes fires according to MisfirePolicy.
 type CreateJobRequest struct {
 	Name          string          `json:"name"`
 	Type          string          `json:"type"`

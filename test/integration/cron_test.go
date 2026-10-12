@@ -62,6 +62,7 @@ func TestCronCreationDefaultsAndReplay(t *testing.T) {
 			}
 			assertBatchRuns(t, jobs, requests)
 			for i, job := range jobs {
+				cleanupCronJob(t, job.ID)
 				if job.NextFireAt == nil || job.MisfirePolicy != "fire_once" {
 					t.Fatalf("missing cron defaults: %+v", job)
 				}

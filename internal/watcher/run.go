@@ -36,7 +36,7 @@ func (o Options) validate() error {
 	return nil
 }
 
-// Run keeps sweeping independent of dispatch and its Kafka transaction.
+// Run keeps sweeping and cron materialization independent of Kafka dispatch.
 func Run(ctx context.Context, data *store.Store, writer, dlq *kafka.Writer, logger *slog.Logger, options Options) error {
 	if err := options.validate(); err != nil {
 		return err
@@ -45,13 +45,17 @@ func Run(ctx context.Context, data *store.Store, writer, dlq *kafka.Writer, logg
 		return fmt.Errorf("watcher writers must be synchronous with RequireAll acknowledgements")
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	var sweeping sync.WaitGroup
-	sweeping.Add(1)
+	var background sync.WaitGroup
+	background.Add(2)
 	go func() {
-		defer sweeping.Done()
+		defer background.Done()
 		sweep(ctx, data, dlq, logger, options)
 	}()
-	defer func() { cancel(); sweeping.Wait() }()
+	go func() {
+		defer background.Done()
+		materialize(ctx, data, logger, options)
+	}()
+	defer func() { cancel(); background.Wait() }()
 	ticker := time.NewTicker(options.DispatchInterval)
 	defer ticker.Stop()
 	for {
@@ -79,6 +83,26 @@ func Run(ctx context.Context, data *store.Store, writer, dlq *kafka.Writer, logg
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
+}
+
+func materialize(ctx context.Context, data *store.Store, logger *slog.Logger, options Options) {
+	ticker := time.NewTicker(options.DispatchInterval)
+	defer ticker.Stop()
+	for {
+		requestCtx, stop := context.WithTimeout(ctx, options.OperationTimeout)
+		count, err := data.MaterializeCron(requestCtx, options.BatchSize)
+		stop()
+		if err != nil && !errors.Is(err, context.Canceled) {
+			logger.Error("cron materialization tick failed", "error", err)
+		} else if count > 0 {
+			logger.Debug("materialized cron runs", "count", count)
+		}
+		select {
+		case <-ctx.Done():
+			return
 		case <-ticker.C:
 		}
 	}
