@@ -32,6 +32,8 @@ func NewAPIRouter(logger *slog.Logger, data *store.Store, cache *redis.Client, a
 	v1.GET("/jobs/:id", handler.getJob)
 	v1.GET("/jobs/:id/runs", handler.listJobRuns)
 	v1.POST("/jobs/:id/run-now", handler.runNow)
+	v1.POST("/jobs/:id/pause", func(c *gin.Context) { handler.setJobPaused(c, true) })
+	v1.POST("/jobs/:id/resume", func(c *gin.Context) { handler.setJobPaused(c, false) })
 	v1.GET("/runs/:id", handler.getRun)
 	v1.POST("/runs/:id/cancel", handler.cancelRun)
 	return router
@@ -162,6 +164,19 @@ func (h *apiHandler) runNow(c *gin.Context) {
 	}
 	h.logger.Debug("created immediate run", "run_id", run.ID, "attempt", run.Attempt)
 	c.JSON(http.StatusCreated, run)
+}
+
+func (h *apiHandler) setJobPaused(c *gin.Context, paused bool) {
+	if !validPathID(c) {
+		return
+	}
+	job, err := h.store.SetJobPaused(c.Request.Context(), c.Param("id"), paused)
+	if err != nil {
+		h.writeStoreError(c, err)
+		return
+	}
+	h.logger.Info("job pause state updated", "job_id", job.ID, "paused", job.Paused)
+	c.JSON(http.StatusOK, job)
 }
 
 func (h *apiHandler) getRun(c *gin.Context) {

@@ -6,7 +6,7 @@
 //
 // Creates generate an idempotency key per call and reuse it on automatic
 // retries. Supply WithIdempotencyKey to replay a create across separate calls.
-// Reads, cancellation, and keyed creates retry network errors and HTTP 5xx;
+// Reads, cancellation, pause/resume, and keyed creates retry network errors and HTTP 5xx;
 // RunNow never retries automatically because it creates a fresh run each time.
 package client
 
@@ -227,6 +227,22 @@ func (c *Client) ScheduleBatch(ctx context.Context, requests []api.CreateJobRequ
 func (c *Client) GetJob(ctx context.Context, jobID string) (api.Job, error) {
 	var job api.Job
 	err := c.request(ctx, http.MethodGet, "/v1/jobs/"+url.PathEscape(jobID), nil, &job, "", true)
+	return job, err
+}
+
+// Pause stops new cron fires. Existing runs and RunNow remain available, and
+// the cursor is preserved. One-shot and deleted jobs cannot be paused.
+func (c *Client) Pause(ctx context.Context, jobID string) (api.Job, error) {
+	var job api.Job
+	err := c.request(ctx, http.MethodPost, "/v1/jobs/"+url.PathEscape(jobID)+"/pause", nil, &job, "", true)
+	return job, err
+}
+
+// Resume enables cron materialization; missed fires follow the job's misfire
+// policy. Pause and Resume retry transient failures using WithRetry settings.
+func (c *Client) Resume(ctx context.Context, jobID string) (api.Job, error) {
+	var job api.Job
+	err := c.request(ctx, http.MethodPost, "/v1/jobs/"+url.PathEscape(jobID)+"/resume", nil, &job, "", true)
 	return job, err
 }
 

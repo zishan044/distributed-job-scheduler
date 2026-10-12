@@ -86,6 +86,17 @@ func TestRoutesAuthenticationAndPayloads(t *testing.T) {
 			job, err := c.GetJob(ctx, "job")
 			return job.ID, err
 		}},
+		{"pause job", "POST", "/v1/jobs/job/pause", false, nil, api.Job{ID: "job", Paused: true}, func(c *client.Client) (string, error) {
+			job, err := c.Pause(ctx, "job")
+			if err == nil && !job.Paused {
+				return "", fmt.Errorf("pause response did not preserve paused state")
+			}
+			return job.ID, err
+		}},
+		{"resume job", "POST", "/v1/jobs/job/resume", false, nil, api.Job{ID: "job"}, func(c *client.Client) (string, error) {
+			job, err := c.Resume(ctx, "job")
+			return job.ID, err
+		}},
 		{"list", "GET", "/v1/jobs/job/runs?limit=25&offset=50", false, nil, []api.Run{{ID: "run"}}, func(c *client.Client) (string, error) {
 			runs, err := c.ListRuns(ctx, "job", 25, 50)
 			if len(runs) != 1 {
@@ -165,6 +176,46 @@ func TestRoutesAuthenticationAndPayloads(t *testing.T) {
 	}
 	if string(handlerRequest.Payload) != `{"handler":"old","duration_ms":10,"nested":{"a":true}}` || handlerRequest.Type != "http" {
 		t.Fatal("handler helper mutated its input")
+	}
+}
+
+func TestPauseResumeRetriesEscapedIDsAndConflicts(t *testing.T) {
+	for _, tc := range []struct {
+		action string
+		paused bool
+		call   func(*client.Client, context.Context, string) (api.Job, error)
+	}{
+		{"pause", true, (*client.Client).Pause},
+		{"resume", false, (*client.Client).Resume},
+	} {
+		for _, status := range []int{http.StatusServiceUnavailable, http.StatusConflict} {
+			t.Run(fmt.Sprintf("%s/%d", tc.action, status), func(t *testing.T) {
+				var calls atomic.Int32
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.Method != http.MethodPost || r.RequestURI != "/proxy/v1/jobs/job%2Fid%3Fx%23y/"+tc.action ||
+						r.Header.Get("Authorization") != "Bearer key" || r.Header.Get("Idempotency-Key") != "" {
+						t.Errorf("unexpected lifecycle request: %s %s, headers %v", r.Method, r.RequestURI, r.Header)
+					}
+					if calls.Add(1) == 1 {
+						w.WriteHeader(status)
+						writeJSON(t, w, api.ErrorResponse{Error: "transition failed"})
+						return
+					}
+					writeJSON(t, w, api.Job{ID: "job", Paused: tc.paused})
+				}))
+				defer server.Close()
+				c := newClient(t, server.URL+"/proxy", client.WithAPIKey("key"), client.WithRetry(2))
+				job, err := tc.call(c, context.Background(), "job/id?x#y")
+				if status == http.StatusConflict {
+					var failure *client.HTTPError
+					if !errors.As(err, &failure) || failure.StatusCode != status || calls.Load() != 1 {
+						t.Fatalf("conflict = %v, calls=%d; want one attempt", err, calls.Load())
+					}
+				} else if err != nil || job.ID != "job" || job.Paused != tc.paused || calls.Load() != 2 {
+					t.Fatalf("retry = %+v, %v, calls=%d; want two attempts", job, err, calls.Load())
+				}
+			})
+		}
 	}
 }
 

@@ -271,6 +271,26 @@ func (s *Store) GetJob(ctx context.Context, id string) (Job, error) {
 	return job, err
 }
 
+// SetJobPaused changes only an active cron definition's pause flag. The UPDATE
+// serializes with the materializer's job lock; its cursor and existing runs are
+// preserved. Repeating the same desired state is harmless.
+func (s *Store) SetJobPaused(ctx context.Context, id string, paused bool) (Job, error) {
+	dbID, err := parseUUID(id)
+	if err != nil {
+		return Job{}, err
+	}
+	job, err := scanJob(s.pool.QueryRow(ctx, `UPDATE jobs SET paused=$2
+		WHERE id=$1 AND cron_expr IS NOT NULL AND deleted_at IS NULL
+		RETURNING `+jobColumns, dbID, paused))
+	if errors.Is(err, pgx.ErrNoRows) {
+		if _, getErr := s.GetJob(ctx, id); getErr != nil {
+			return Job{}, getErr
+		}
+		return Job{}, ErrInvalidTransition
+	}
+	return job, err
+}
+
 func (s *Store) GetRun(ctx context.Context, id string) (Run, error) {
 	dbID, err := parseUUID(id)
 	if err != nil {
