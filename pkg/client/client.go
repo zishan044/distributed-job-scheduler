@@ -7,7 +7,7 @@
 // Creates generate an idempotency key per call and reuse it on automatic
 // retries. Supply WithIdempotencyKey to replay a create across separate calls.
 // Reads, cancellation, pause/resume, and keyed creates retry network errors and HTTP 5xx;
-// RunNow never retries automatically because it creates a fresh run each time.
+// RunNow and Retry never retry automatically because each call creates a fresh run.
 package client
 
 import (
@@ -96,7 +96,7 @@ func WithHTTPClient(httpClient *http.Client) Option {
 
 // WithRetry sets total attempts for operations safe to repeat; 1 disables
 // retries. Delays start at 100ms, double up to one second, and honor context
-// cancellation. RunNow always uses one attempt regardless of this option.
+// cancellation. RunNow and Retry always use one attempt regardless of this option.
 func WithRetry(attempts int) Option {
 	return func(c *Client) error {
 		if attempts < 1 {
@@ -281,6 +281,15 @@ func (c *Client) RunNow(ctx context.Context, jobID string) (api.Run, error) {
 func (c *Client) Cancel(ctx context.Context, runID string) (api.Run, error) {
 	var run api.Run
 	err := c.request(ctx, http.MethodPost, "/v1/runs/"+url.PathEscape(runID)+"/cancel", nil, &run, "", true)
+	return run, err
+}
+
+// Retry creates a fresh run at attempt 1 linked to a DEAD source through
+// RetryOf. Each call starts another chain and leaves the source unchanged.
+// It never retries automatically: a lost response may hide a successful create.
+func (c *Client) Retry(ctx context.Context, runID string) (api.Run, error) {
+	var run api.Run
+	err := c.request(ctx, http.MethodPost, "/v1/runs/"+url.PathEscape(runID)+"/retry", nil, &run, "", false)
 	return run, err
 }
 

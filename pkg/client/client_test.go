@@ -14,6 +14,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	"github.com/zishan044/distributed-job-scheduler/pkg/api"
@@ -114,6 +115,13 @@ func TestRoutesAuthenticationAndPayloads(t *testing.T) {
 		}},
 		{"cancel", "POST", "/v1/runs/run/cancel", false, nil, api.Run{ID: "run", Status: api.StatusRunning, CancelRequested: true}, func(c *client.Client) (string, error) {
 			run, err := c.Cancel(ctx, "run")
+			return run.ID, err
+		}},
+		{"retry", "POST", "/v1/runs/dead/retry", false, nil, api.Run{ID: "run", RetryOf: "dead", Attempt: 1, Status: api.StatusPending}, func(c *client.Client) (string, error) {
+			run, err := c.Retry(ctx, "dead")
+			if err == nil && (run.RetryOf != "dead" || run.Attempt != 1 || run.Status != api.StatusPending) {
+				return "", fmt.Errorf("retry response lost its chain identity: %+v", run)
+			}
 			return run.ID, err
 		}},
 	} {
@@ -300,6 +308,47 @@ func TestNetworkRetryAndFrozenCallerData(t *testing.T) {
 	jobs, err := c.ScheduleBatch(context.Background(), requests, client.WithIdempotencyKey(" explicit-key "))
 	if err != nil || len(jobs) != 1 || calls != 3 || firstKey != "explicit-key" {
 		t.Fatalf("network retry = %+v, %v, calls=%d, key=%q", jobs, err, calls, firstKey)
+	}
+}
+
+func TestRetryFailuresNeverRetryAutomatically(t *testing.T) {
+	for _, kind := range []string{"network", "server", "truncated"} {
+		t.Run(kind, func(t *testing.T) {
+			var calls int
+			failure := errors.New("response lost after create")
+			httpClient := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+				calls++
+				if r.Method != http.MethodPost || r.URL.EscapedPath() != "/proxy/v1/runs/dead%2Fid/retry" || r.Header.Get("Idempotency-Key") != "" {
+					t.Errorf("unexpected retry request: %s %s, headers %v", r.Method, r.URL, r.Header)
+				}
+				if kind == "network" {
+					return nil, failure
+				}
+				if kind == "truncated" {
+					return &http.Response{StatusCode: 201, Header: make(http.Header), Body: io.NopCloser(iotest.ErrReader(io.ErrUnexpectedEOF))}, nil
+				}
+				return &http.Response{StatusCode: 503, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"error":"unavailable"}`))}, nil
+			})}
+			_, err := newClient(t, "http://scheduler.example/proxy", client.WithHTTPClient(httpClient), client.WithRetry(5)).Retry(context.Background(), "dead/id")
+			if calls != 1 || err == nil {
+				t.Fatalf("retry failure = %v, calls=%d; want one attempt", err, calls)
+			}
+			switch kind {
+			case "network":
+				if !errors.Is(err, failure) {
+					t.Fatalf("network error was lost: %v", err)
+				}
+			case "truncated":
+				if !errors.Is(err, io.ErrUnexpectedEOF) {
+					t.Fatalf("truncated response error was lost: %v", err)
+				}
+			case "server":
+				var response *client.HTTPError
+				if !errors.As(err, &response) || response.StatusCode != 503 {
+					t.Fatalf("server error was lost: %v", err)
+				}
+			}
+		})
 	}
 }
 

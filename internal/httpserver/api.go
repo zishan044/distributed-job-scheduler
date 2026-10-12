@@ -36,6 +36,7 @@ func NewAPIRouter(logger *slog.Logger, data *store.Store, cache *redis.Client, a
 	v1.POST("/jobs/:id/resume", func(c *gin.Context) { handler.setJobPaused(c, false) })
 	v1.GET("/runs/:id", handler.getRun)
 	v1.POST("/runs/:id/cancel", handler.cancelRun)
+	v1.POST("/runs/:id/retry", handler.retryRun)
 	return router
 }
 
@@ -202,6 +203,19 @@ func (h *apiHandler) cancelRun(c *gin.Context) {
 	}
 	h.logger.Info("run cancellation accepted", "run_id", run.ID, "attempt", run.Attempt, "status", run.Status)
 	c.JSON(http.StatusOK, run)
+}
+
+func (h *apiHandler) retryRun(c *gin.Context) {
+	if !validPathID(c) {
+		return
+	}
+	run, err := h.store.RetryRun(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		h.writeStoreError(c, err)
+		return
+	}
+	h.logger.Info("created retry run", "run_id", run.ID, "attempt", run.Attempt, "retry_of", run.RetryOf)
+	c.JSON(http.StatusCreated, run)
 }
 
 func validPathID(c *gin.Context) bool {

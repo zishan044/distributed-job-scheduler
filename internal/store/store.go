@@ -362,6 +362,38 @@ func (s *Store) RunNow(ctx context.Context, jobID string) (Run, error) {
 	return run, err
 }
 
+// RetryRun creates a new attempt chain due immediately from a DEAD run. The
+// source and its attempts stay immutable; each call creates a separate chain.
+func (s *Store) RetryRun(ctx context.Context, id string) (Run, error) {
+	sourceID, err := parseUUID(id)
+	if err != nil {
+		return Run{}, err
+	}
+	runID, err := uuid.NewV7()
+	if err != nil {
+		return Run{}, fmt.Errorf("generate retry run id: %w", err)
+	}
+	run, err := scanRun(s.pool.QueryRow(ctx, `
+		WITH retry_source AS (
+			SELECT r.job_id FROM job_runs r JOIN jobs j ON j.id=r.job_id
+			WHERE r.id=$2 AND r.status='DEAD' AND j.deleted_at IS NULL
+			FOR UPDATE OF j
+		)
+		INSERT INTO job_runs (id, job_id, fire_time, scheduled_for, status, retry_of)
+		SELECT $1, job_id, now(), now(), 'PENDING', $2 FROM retry_source
+		RETURNING `+runColumns, databaseUUID(runID), sourceID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		if _, getErr := s.GetRun(ctx, id); getErr != nil {
+			return Run{}, getErr
+		}
+		return Run{}, ErrInvalidTransition
+	}
+	if err == nil {
+		s.Metrics.Retries.Inc()
+	}
+	return run, err
+}
+
 func (s *Store) CancelRun(ctx context.Context, id string) (Run, error) {
 	dbID, err := parseUUID(id)
 	if err != nil {

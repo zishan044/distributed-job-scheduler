@@ -82,7 +82,8 @@ type Run struct {
 	FinishedAt      *time.Time `json:"finished_at,omitempty"`
 	LastError       string     `json:"last_error,omitempty"`
 	CancelRequested bool       `json:"cancel_requested"`
-	RetryOf         string     `json:"retry_of,omitempty"`
+	// RetryOf identifies the DEAD source of a manually created attempt chain.
+	RetryOf string `json:"retry_of,omitempty"`
 }
 
 // HTTPPayload describes an HTTP job. An empty Method defaults to GET.
