@@ -178,6 +178,18 @@ services:
       start_period: 20s
     restart: unless-stopped
 
+  http-reminder:
+    profiles: [examples]
+    image: distributed-job-scheduler-http-reminder:local
+    build:
+      context: .
+      args:
+        PACKAGE: ./examples/http-reminder
+    command: ["-api-url=http://api:8080"]
+    environment:
+      API_KEY: ${API_KEY:-scheduler-local}
+    restart: "no"
+
   smoke:
     profiles: [tools]
     image: distributed-job-scheduler-smoke:local

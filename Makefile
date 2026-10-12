@@ -20,5 +20,5 @@ test:
 	go test -count=1 -tags=integration ./test/integration
 
 lint:
-	@test -z "$$(gofmt -l $$(find cmd internal test -type f -name '*.go'))"
+	@test -z "$$(gofmt -l $$(find cmd internal pkg examples test -type f -name '*.go'))"
 	golangci-lint run ./...
