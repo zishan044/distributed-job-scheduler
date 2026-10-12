@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -74,7 +75,18 @@ func (s *Store) CreateJobs(ctx context.Context, requests []api.CreateJobRequest,
 	ids := make([]pgtype.UUID, len(jobs))
 	jobArgs := make([]any, 0, len(jobs)*13)
 	runArgs := make([]any, 0, len(jobs)*5)
+	var now time.Time
 	for i, job := range jobs {
+		if job.CronExpr != "" {
+			if now.IsZero() {
+				if err := tx.QueryRow(ctx, `SELECT now()`).Scan(&now); err != nil {
+					return nil, false, err
+				}
+			}
+			if err := initializeCron(&job, now); err != nil {
+				return nil, false, fmt.Errorf("batch job %d: %w", i, err)
+			}
+		}
 		id, err := uuid.NewV7()
 		if err != nil {
 			return nil, false, fmt.Errorf("generate job id: %w", err)

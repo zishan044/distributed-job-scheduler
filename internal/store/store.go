@@ -139,8 +139,27 @@ func prepareJob(job Job, firstRunAt *time.Time) (Job, error) {
 	if job.Timezone == "" {
 		job.Timezone = "UTC"
 	}
+	if job.Timezone == "Local" {
+		return Job{}, fmt.Errorf("%w: timezone must be an IANA location, not Local", ErrInvalidJob)
+	}
+	if _, err := time.LoadLocation(job.Timezone); err != nil {
+		return Job{}, fmt.Errorf("%w: invalid timezone: %v", ErrInvalidJob, err)
+	}
 	if job.MisfirePolicy == "" {
 		job.MisfirePolicy = "fire_once"
+	}
+	switch job.MisfirePolicy {
+	case "fire_once", "skip", "fire_all":
+	default:
+		return Job{}, fmt.Errorf("%w: misfire_policy must be fire_once, skip or fire_all", ErrInvalidJob)
+	}
+	if job.CronExpr != "" {
+		if _, err := parseCron(job.CronExpr, job.Timezone); err != nil {
+			return Job{}, err
+		}
+		if job.NextFireAt != nil && job.NextFireAt.IsZero() {
+			return Job{}, fmt.Errorf("%w: next_fire_at must not be zero", ErrInvalidJob)
+		}
 	}
 	if job.MaxAttempts == 0 {
 		job.MaxAttempts = 5
@@ -175,6 +194,16 @@ func (s *Store) CreateJob(ctx context.Context, job Job, firstRunAt *time.Time) (
 		return Job{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+
+	if job.CronExpr != "" {
+		var now time.Time
+		if err := tx.QueryRow(ctx, `SELECT now()`).Scan(&now); err != nil {
+			return Job{}, err
+		}
+		if err := initializeCron(&job, now); err != nil {
+			return Job{}, err
+		}
+	}
 
 	created, err := scanJob(tx.QueryRow(ctx, `
 		INSERT INTO jobs (
