@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func KafkaBrokers() ([]string, error) {
@@ -25,13 +26,40 @@ func KafkaBrokers() ([]string, error) {
 }
 
 func ExecutorConcurrency() (int, error) {
-	value := strings.TrimSpace(os.Getenv("EXECUTOR_CONCURRENCY"))
+	return envInt("EXECUTOR_CONCURRENCY", 10, 1000)
+}
+
+func WatcherBatchSize() (int, error) {
+	return envInt("WATCHER_BATCH_SIZE", 1000, 2000)
+}
+
+func KafkaBatchSize() (int, error) {
+	return envInt("KAFKA_BATCH_SIZE", 100, 0)
+}
+
+func KafkaBatchTimeout() (time.Duration, error) {
+	value := strings.TrimSpace(os.Getenv("KAFKA_BATCH_TIMEOUT"))
 	if value == "" {
-		return 10, nil
+		return 5 * time.Millisecond, nil
+	}
+	timeout, err := time.ParseDuration(value)
+	if err != nil || timeout <= 0 {
+		return 0, fmt.Errorf("KAFKA_BATCH_TIMEOUT must be a positive duration")
+	}
+	return timeout, nil
+}
+
+func envInt(name string, fallback, maximum int) (int, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback, nil
 	}
 	count, err := strconv.Atoi(value)
-	if err != nil || count < 1 || count > 1000 {
-		return 0, fmt.Errorf("EXECUTOR_CONCURRENCY must be between 1 and 1000")
+	if err != nil || count < 1 || (maximum > 0 && count > maximum) {
+		if maximum > 0 {
+			return 0, fmt.Errorf("%s must be between 1 and %d", name, maximum)
+		}
+		return 0, fmt.Errorf("%s must be a positive integer", name)
 	}
 	return count, nil
 }

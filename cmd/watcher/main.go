@@ -35,6 +35,19 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	options := watcher.DefaultOptions()
+	options.BatchSize, err = config.WatcherBatchSize()
+	if err != nil {
+		return err
+	}
+	batchSize, err := config.KafkaBatchSize()
+	if err != nil {
+		return err
+	}
+	batchTimeout, err := config.KafkaBatchTimeout()
+	if err != nil {
+		return err
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -48,7 +61,8 @@ func run(logger *slog.Logger) error {
 		Topic:        "jobs.run",
 		Balancer:     &kafka.Hash{},
 		RequiredAcks: kafka.RequireAll,
-		BatchTimeout: 5 * time.Millisecond,
+		BatchSize:    batchSize,
+		BatchTimeout: batchTimeout,
 	}
 	defer writer.Close()
 	dlq := &kafka.Writer{
@@ -62,7 +76,7 @@ func run(logger *slog.Logger) error {
 		serveErr <- httpserver.Serve(config.HTTPAddr(), httpserver.NewRouter("watcher", logger, data.Metrics.Registry), logger)
 	}()
 	watchErr := make(chan error, 1)
-	go func() { watchErr <- watcher.Run(ctx, data, writer, dlq, logger, watcher.DefaultOptions()) }()
+	go func() { watchErr <- watcher.Run(ctx, data, writer, dlq, logger, options) }()
 	select {
 	case err := <-serveErr:
 		stop()
