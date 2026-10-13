@@ -1,4 +1,6 @@
 .git
 .env
 bin
+docs/bench/results
+scripts/__pycache__
 Distributed Job Scheduler in Go Implementation Plan.md

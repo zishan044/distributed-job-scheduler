@@ -16,7 +16,8 @@ case "$profile" in
 esac
 case "$scenario" in
   setup) ;;
-  *) echo "Only scenario setup is available; ingest, herd and soak arrive in subset 2." >&2; exit 2 ;;
+  ingest|herd|soak) python3 scripts/bench.py "$profile" "$scenario" --validate ;;
+  *) echo "Scenario must be setup, ingest, herd or soak." >&2; exit 2 ;;
 esac
 for name in BENCH_WATCHERS BENCH_EXECUTORS BENCH_PARTITIONS BENCH_DB_POOL_MAX_CONNS; do
   value=${!name:-1}
@@ -63,4 +64,8 @@ fi
 "${bench[@]}" down --volumes --remove-orphans
 echo "Benchmark profile: $profile (synchronous_commit=$BENCH_SYNCHRONOUS_COMMIT, fsync=on)"
 "${bench[@]}" up -d --wait --wait-timeout 180
-"${bench[@]}" run --rm --no-deps -T k6 run /scripts/setup.js
+if [[ "$scenario" == setup ]]; then
+  "${bench[@]}" run --rm --no-deps -T k6 run /scripts/setup.js
+else
+  python3 scripts/bench.py "$profile" "$scenario"
+fi

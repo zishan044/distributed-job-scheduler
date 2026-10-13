@@ -65,7 +65,7 @@ run durable setup
 [[ $result == 2 ]]
 ! contains 'compose -p scheduler-bench -f docker-compose.yml -f docker-compose.bench.yml down --volumes --remove-orphans'
 unset BENCH_TEST_DEV_NAME
-for args in 'unknown setup' 'durable soak'; do
+for args in 'unknown setup' 'durable unknown'; do
   read -r -a values <<< "$args"
   run "${values[@]}"
   [[ $result == 2 && ! -s "$BENCH_TEST_LOG" ]]

@@ -1,0 +1,330 @@
+{
+  "20261013T181530Z-ae7a20-durable-ingest": {
+    "scenario": "ingest",
+    "accepted_jobs": 300100,
+    "measurement_accepted_jobs": 300100,
+    "offered_jobs_per_second": 5000,
+    "window_start": 1791915340.507,
+    "window_end": 1791915400.512,
+    "window_seconds": 60.00500011444092,
+    "dropped_iterations": 0,
+    "rejected_batches": 0,
+    "reconciled": true,
+    "errors": [],
+    "load_generation_complete": true,
+    "rates": {
+      "ingest_jobs_per_second": 5001.249886303681,
+      "dispatch_jobs_per_second": null,
+      "successful_jobs_per_second": null
+    },
+    "start_latency_seconds": {
+      "max": null,
+      "p50": null,
+      "p95": null,
+      "p99": null,
+      "count": 0
+    },
+    "profile": "durable",
+    "k6_exit_code": 0,
+    "unfinished_runs": 0,
+    "drain_seconds": 0,
+    "drain_collection_seconds": 0.5981610779999755,
+    "execution_counter": {
+      "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+      "window_start": 1791915345.233,
+      "window_end": 1791915400.233,
+      "window_seconds": 55.0,
+      "samples": 12,
+      "successful_executions": 0.0,
+      "successful_jobs_per_second": 0.0
+    }
+  },
+  "20261013T182030Z-ce360e-bench-ingest": {
+    "scenario": "ingest",
+    "accepted_jobs": 300000,
+    "measurement_accepted_jobs": 300000,
+    "offered_jobs_per_second": 5000,
+    "window_start": 1791915641.244,
+    "window_end": 1791915701.244,
+    "window_seconds": 60.0,
+    "dropped_iterations": 0,
+    "rejected_batches": 0,
+    "reconciled": true,
+    "errors": [],
+    "load_generation_complete": true,
+    "rates": {
+      "ingest_jobs_per_second": 5000.0,
+      "dispatch_jobs_per_second": null,
+      "successful_jobs_per_second": null
+    },
+    "start_latency_seconds": {
+      "max": null,
+      "p50": null,
+      "p95": null,
+      "p99": null,
+      "count": 0
+    },
+    "profile": "bench",
+    "k6_exit_code": 0,
+    "unfinished_runs": 0,
+    "drain_seconds": 0,
+    "drain_collection_seconds": 0.6680456909998611,
+    "execution_counter": {
+      "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+      "window_start": 1791915645.963,
+      "window_end": 1791915700.963,
+      "window_seconds": 55.0,
+      "samples": 12,
+      "successful_executions": 0.0,
+      "successful_jobs_per_second": 0.0
+    }
+  },
+  "20261013T181756Z-218706-durable-herd": {
+    "scenario": "herd",
+    "accepted_jobs": 50000,
+    "measurement_accepted_jobs": 50000,
+    "offered_jobs_per_second": null,
+    "window_start": 1791915517.356,
+    "window_end": 1791915560.795612,
+    "window_seconds": 43.43961215019226,
+    "dropped_iterations": 0,
+    "rejected_batches": 0,
+    "reconciled": true,
+    "errors": [],
+    "load_generation_complete": true,
+    "rates": {
+      "ingest_jobs_per_second": null,
+      "dispatch_jobs_per_second": 23757.40340092544,
+      "successful_jobs_per_second": 1151.0231681425983
+    },
+    "start_latency_seconds": {
+      "max": 43.43844,
+      "p50": 37.5375465,
+      "p95": 42.97786635,
+      "p99": 43.30363715,
+      "count": 50000
+    },
+    "profile": "durable",
+    "k6_exit_code": 0,
+    "unfinished_runs": 0,
+    "drain_seconds": 43.43961215019226,
+    "drain_collection_seconds": 41.166853374999846,
+    "execution_counter": {
+      "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+      "window_start": 1791915522.089,
+      "window_end": 1791915557.089,
+      "window_seconds": 35.0,
+      "samples": 8,
+      "successful_executions": 22720.0,
+      "successful_jobs_per_second": 649.1428571428571
+    }
+  },
+  "20261013T182253Z-5dbdda-bench-herd": {
+    "scenario": "herd",
+    "accepted_jobs": 50000,
+    "measurement_accepted_jobs": 50000,
+    "offered_jobs_per_second": null,
+    "window_start": 1791915813.92,
+    "window_end": 1791915855.322538,
+    "window_seconds": 41.40253782272339,
+    "dropped_iterations": 0,
+    "rejected_batches": 0,
+    "reconciled": true,
+    "errors": [],
+    "load_generation_complete": true,
+    "rates": {
+      "ingest_jobs_per_second": null,
+      "dispatch_jobs_per_second": 23802.712177513367,
+      "successful_jobs_per_second": 1207.655439241166
+    },
+    "start_latency_seconds": {
+      "max": 41.402295,
+      "p50": 33.917657,
+      "p95": 41.21866985,
+      "p99": 41.35710217,
+      "count": 50000
+    },
+    "profile": "bench",
+    "k6_exit_code": 0,
+    "unfinished_runs": 0,
+    "drain_seconds": 41.40253782272339,
+    "drain_collection_seconds": 41.192391960999885,
+    "execution_counter": {
+      "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+      "window_start": 1791915818.654,
+      "window_end": 1791915853.654,
+      "window_seconds": 35.0,
+      "samples": 8,
+      "successful_executions": 25370.0,
+      "successful_jobs_per_second": 724.8571428571429
+    }
+  },
+  "20261013T184404Z-87c9ad-durable-soak": {
+    "scenario": "soak",
+    "accepted_jobs": 1069200,
+    "measurement_accepted_jobs": 919200,
+    "offered_jobs_per_second": 5000,
+    "window_start": 1791917084.614,
+    "window_end": 1791917268.44,
+    "window_seconds": 183.82599997520447,
+    "dropped_iterations": 0,
+    "rejected_batches": 0,
+    "reconciled": true,
+    "errors": [],
+    "load_generation_complete": true,
+    "rates": {
+      "ingest_jobs_per_second": 5000.380795556597,
+      "dispatch_jobs_per_second": 4999.292810178974,
+      "successful_jobs_per_second": 4067.776049638586
+    },
+    "start_latency_seconds": {
+      "max": 40.744427,
+      "p50": 0.182883,
+      "p95": 38.531178499999996,
+      "p99": 39.97383805,
+      "count": 919200
+    },
+    "profile": "durable",
+    "k6_exit_code": 105,
+    "unfinished_runs": 0,
+    "drain_seconds": 27.74164891242981,
+    "aborted_for_overload": true,
+    "completed_measurement": false,
+    "drain_collection_seconds": 35.87852096500137,
+    "execution_counter": {
+      "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+      "window_start": 1791917089.107,
+      "window_end": 1791917264.107,
+      "window_seconds": 175.0,
+      "samples": 36,
+      "successful_executions": 694195.0,
+      "successful_jobs_per_second": 3966.8285714285716
+    }
+  },
+  "20261013T184913Z-a2a82a-bench-soak": {
+    "scenario": "soak",
+    "accepted_jobs": 3150100,
+    "measurement_accepted_jobs": 3000100,
+    "offered_jobs_per_second": 5000,
+    "window_start": 1791917394.387,
+    "window_end": 1791917994.391,
+    "window_seconds": 600.0039999485016,
+    "dropped_iterations": 0,
+    "rejected_batches": 0,
+    "reconciled": true,
+    "errors": [],
+    "load_generation_complete": true,
+    "rates": {
+      "ingest_jobs_per_second": 5000.133332873613,
+      "dispatch_jobs_per_second": 5000.156666051394,
+      "successful_jobs_per_second": 4999.966667318035
+    },
+    "start_latency_seconds": {
+      "max": 0.787366,
+      "p50": 0.113513,
+      "p95": 0.187512,
+      "p99": 0.3017440099999998,
+      "count": 3000100
+    },
+    "profile": "bench",
+    "k6_exit_code": 0,
+    "unfinished_runs": 0,
+    "drain_seconds": 0.09073901176452637,
+    "aborted_for_overload": false,
+    "completed_measurement": true,
+    "drain_collection_seconds": 14.731869699997333,
+    "execution_counter": {
+      "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+      "window_start": 1791917399.06,
+      "window_end": 1791917994.06,
+      "window_seconds": 595.0,
+      "samples": 120,
+      "successful_executions": 2975080.0,
+      "successful_jobs_per_second": 5000.134453781513
+    }
+  },
+  "20261013T195127Z-4d54d3-durable-soak": {
+    "scenario": "soak",
+    "accepted_jobs": 630100,
+    "measurement_accepted_jobs": 600100,
+    "offered_jobs_per_second": 1000,
+    "window_start": 1791921127.951,
+    "window_end": 1791921727.957,
+    "window_seconds": 600.0060000419617,
+    "dropped_iterations": 0,
+    "rejected_batches": 0,
+    "reconciled": true,
+    "errors": [],
+    "load_generation_complete": true,
+    "rates": {
+      "ingest_jobs_per_second": 1000.1566650300693,
+      "dispatch_jobs_per_second": 999.9900000300643,
+      "successful_jobs_per_second": 999.9900000300643
+    },
+    "start_latency_seconds": {
+      "max": 0.488742,
+      "p50": 0.1377735,
+      "p95": 0.168301,
+      "p99": 0.17486401000000001,
+      "count": 600100
+    },
+    "drain_seconds": 0.0769040584564209,
+    "profile": "durable",
+    "k6_exit_code": 0,
+    "unfinished_runs": 0,
+    "drain_collection_seconds": 2.733750486997451,
+    "aborted_for_overload": false,
+    "completed_measurement": true,
+    "execution_counter": {
+      "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+      "window_start": 1791921132.671,
+      "window_end": 1791921727.671,
+      "window_seconds": 595.0,
+      "samples": 120,
+      "successful_executions": 595083.0,
+      "successful_jobs_per_second": 1000.1394957983193
+    }
+  },
+  "20261013T200700Z-cc4f84-durable-soak": {
+    "scenario": "soak",
+    "accepted_jobs": 3600,
+    "measurement_accepted_jobs": 3600,
+    "offered_jobs_per_second": 100,
+    "window_start": 1791922031.207,
+    "window_end": 1791922066.213,
+    "window_seconds": 35.00600004196167,
+    "dropped_iterations": 0,
+    "rejected_batches": 0,
+    "reconciled": true,
+    "errors": [],
+    "load_generation_complete": true,
+    "rates": {
+      "ingest_jobs_per_second": 102.8395131030304,
+      "dispatch_jobs_per_second": 99.98285996127956,
+      "successful_jobs_per_second": 99.98285996127956
+    },
+    "start_latency_seconds": {
+      "max": 0.218515,
+      "p50": 0.07464000000000001,
+      "p95": 0.11671659999999999,
+      "p99": 0.20532952,
+      "count": 3600
+    },
+    "drain_seconds": 0.08591985702514648,
+    "profile": "durable",
+    "k6_exit_code": 105,
+    "unfinished_runs": 0,
+    "drain_collection_seconds": 0.19660523199854651,
+    "aborted_for_overload": true,
+    "completed_measurement": false,
+    "execution_counter": {
+      "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+      "window_start": 1791922035.893,
+      "window_end": 1791922065.893,
+      "window_seconds": 30.0,
+      "samples": 7,
+      "successful_executions": 2993.0,
+      "successful_jobs_per_second": 99.76666666666667
+    }
+  }
+}

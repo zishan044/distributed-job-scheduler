@@ -63,4 +63,5 @@ services:
       API_KEY: ${API_KEY:-scheduler-local}
     volumes:
       - ./test/load:/scripts:ro
+      - ${BENCH_RESULTS_DIR:-./docs/bench/results}:/results
     restart: "no"
