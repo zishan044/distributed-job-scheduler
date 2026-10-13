@@ -13,6 +13,8 @@ services:
       - max_wal_size=${BENCH_MAX_WAL_SIZE:-1GB}
       - -c
       - fsync=on
+      - -c
+      - autovacuum_naptime=${BENCH_AUTOVACUUM_NAPTIME:-1min}
 
   topic-init:
     command:

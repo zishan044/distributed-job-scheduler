@@ -1,0 +1,5521 @@
+{
+  "date": "2026-10-14",
+  "timezone": "Asia/Dhaka",
+  "short_trial_limit": 8,
+  "short_trials": [
+    {
+      "trial": 1,
+      "kind": "reference",
+      "delta": {},
+      "directory": "20261013T203201Z-45f70a-durable-soak",
+      "requested_measurement_seconds": 180,
+      "offered_jobs_per_second": 5000,
+      "notes": "Measurement and reconciliation passed. Shell exit 127 after measurement because runner was edited while Bash was executing it; restoration trap completed and original six development containers were verified running.",
+      "summary": {
+        "scenario": "soak",
+        "accepted_jobs": 1050100,
+        "measurement_accepted_jobs": 900100,
+        "offered_jobs_per_second": 5000,
+        "window_start": 1791923561.613,
+        "window_end": 1791923741.618,
+        "window_seconds": 180.00500011444092,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": 5000.416651913823,
+          "dispatch_jobs_per_second": 5000.3277654940575,
+          "successful_jobs_per_second": 5000.111104845881
+        },
+        "start_latency_seconds": {
+          "max": 0.390213,
+          "p50": 0.156126,
+          "p95": 0.225288,
+          "p99": 0.2714420600000001,
+          "count": 900100
+        },
+        "drain_seconds": 0.15252208709716797,
+        "profile": "durable",
+        "k6_exit_code": 0,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 4.383083718999842,
+        "aborted_for_overload": false,
+        "completed_measurement": true,
+        "execution_counter": {
+          "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+          "window_start": 1791923566.26,
+          "window_end": 1791923741.26,
+          "window_seconds": 175.0,
+          "samples": 36,
+          "successful_executions": 874775.0,
+          "successful_jobs_per_second": 4998.714285714285
+        }
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "1024",
+        "shared_buffers": "16384",
+        "max_connections": "100",
+        "autovacuum_naptime": "60",
+        "synchronous_commit": "on",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "configuration": {
+        "name": "scheduler-bench",
+        "networks": {
+          "default": {
+            "name": "scheduler-bench_default",
+            "ipam": {}
+          }
+        },
+        "services": {
+          "api": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "api"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>",
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "HTTP_ADDR": ":8080",
+              "KAFKA_BROKERS": "kafka:9092",
+              "REDIS_ADDR": "redis:6379"
+            },
+            "image": "distributed-job-scheduler-api:bench",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 8080,
+                "published": "18080",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped"
+          },
+          "echo": {
+            "command": [
+              "-listen=:5678",
+              "-text=ok"
+            ],
+            "entrypoint": null,
+            "image": "hashicorp/http-echo:1.0.0",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped"
+          },
+          "executor": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "executor"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "deploy": {
+              "replicas": 3,
+              "resources": {},
+              "placement": {}
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "EXECUTOR_CONCURRENCY": "10",
+              "HTTP_ADDR": ":8080",
+              "HTTP_ALLOWED_HOSTS": "echo",
+              "KAFKA_BROKERS": "kafka:9092"
+            },
+            "image": "distributed-job-scheduler-executor:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "stop_grace_period": "40s"
+          },
+          "grafana": {
+            "command": null,
+            "depends_on": {
+              "prometheus": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH": "/etc/grafana/dashboards/scheduler.json",
+              "GF_SECURITY_ADMIN_PASSWORD": "<redacted>",
+              "GF_SECURITY_ADMIN_USER": "admin"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "wget",
+                "--spider",
+                "-q",
+                "http://localhost:3000/api/health"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20,
+              "start_period": "20s"
+            },
+            "image": "grafana/grafana:13.2.3",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 3000,
+                "published": "13000",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/grafana/provisioning",
+                "target": "/etc/grafana/provisioning",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/grafana/dashboards",
+                "target": "/etc/grafana/dashboards",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "volume",
+                "source": "grafana-data",
+                "target": "/var/lib/grafana",
+                "volume": {}
+              }
+            ]
+          },
+          "k6": {
+            "profiles": [
+              "tools"
+            ],
+            "command": null,
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>"
+            },
+            "image": "grafana/k6:1.6.1",
+            "networks": {
+              "default": null
+            },
+            "restart": "no",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/test/load",
+                "target": "/scripts",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/docs/bench/results/20261013T203201Z-45f70a-durable-soak",
+                "target": "/results",
+                "bind": {}
+              }
+            ]
+          },
+          "kafka": {
+            "command": null,
+            "entrypoint": null,
+            "environment": {
+              "KAFKA_ADVERTISED_LISTENERS": "PLAINTEXT://kafka:9092",
+              "KAFKA_CONTROLLER_LISTENER_NAMES": "CONTROLLER",
+              "KAFKA_CONTROLLER_QUORUM_VOTERS": "1@kafka:9093",
+              "KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS": "0",
+              "KAFKA_LISTENERS": "PLAINTEXT://:9092,CONTROLLER://:9093",
+              "KAFKA_LISTENER_SECURITY_PROTOCOL_MAP": "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT",
+              "KAFKA_LOG_DIRS": "/var/lib/kafka/data",
+              "KAFKA_NODE_ID": "1",
+              "KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR": "1",
+              "KAFKA_PROCESS_ROLES": "broker,controller",
+              "KAFKA_TRANSACTION_STATE_LOG_MIN_ISR": "1",
+              "KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR": "1"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD-SHELL",
+                "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"
+              ],
+              "timeout": "5s",
+              "interval": "5s",
+              "retries": 30,
+              "start_period": "20s"
+            },
+            "image": "apache/kafka:4.2.2",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "kafka-data",
+                "target": "/var/lib/kafka/data",
+                "volume": {}
+              }
+            ]
+          },
+          "migrate": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "migrate"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "postgres": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable"
+            },
+            "image": "distributed-job-scheduler-migrate:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "postgres": {
+            "command": [
+              "postgres",
+              "-c",
+              "synchronous_commit=on",
+              "-c",
+              "shared_buffers=128MB",
+              "-c",
+              "max_wal_size=1GB",
+              "-c",
+              "fsync=on"
+            ],
+            "entrypoint": null,
+            "environment": {
+              "POSTGRES_DB": "scheduler",
+              "POSTGRES_PASSWORD": "<redacted>",
+              "POSTGRES_USER": "scheduler"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD-SHELL",
+                "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20,
+              "start_period": "10s"
+            },
+            "image": "postgres:18.6-bookworm",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "postgres-data",
+                "target": "/var/lib/postgresql",
+                "volume": {}
+              }
+            ]
+          },
+          "prometheus": {
+            "command": null,
+            "entrypoint": null,
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "wget",
+                "--spider",
+                "-q",
+                "http://localhost:9090/-/ready"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20
+            },
+            "image": "prom/prometheus:v3.15.0",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 9090,
+                "published": "19090",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/prometheus.yml",
+                "target": "/etc/prometheus/prometheus.yml",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "volume",
+                "source": "prometheus-data",
+                "target": "/prometheus",
+                "volume": {}
+              }
+            ]
+          },
+          "redis": {
+            "command": [
+              "redis-server",
+              "--appendonly",
+              "yes"
+            ],
+            "entrypoint": null,
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "redis-cli",
+                "ping"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20
+            },
+            "image": "redis:8.10.2-trixie",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "redis-data",
+                "target": "/data",
+                "volume": {}
+              }
+            ]
+          },
+          "smoke": {
+            "profiles": [
+              "tools"
+            ],
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "smoke"
+              }
+            },
+            "command": [
+              "-api-url=http://api:8080",
+              "-prometheus-url=http://prometheus:9090",
+              "-grafana-url=http://grafana:3000"
+            ],
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>",
+              "GRAFANA_ADMIN_PASSWORD": "<redacted>"
+            },
+            "image": "distributed-job-scheduler-smoke:local",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "topic-init": {
+            "command": [
+              "until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1; do sleep 1; done\n/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic jobs.run --partitions 12 --replication-factor 1\n/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic jobs.dlq --partitions 3 --replication-factor 1\n"
+            ],
+            "depends_on": {
+              "kafka": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": [
+              "/bin/sh",
+              "-ec"
+            ],
+            "image": "apache/kafka:4.2.2",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "watcher": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "watcher"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "deploy": {
+              "replicas": 2,
+              "resources": {},
+              "placement": {}
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "HTTP_ADDR": ":8080",
+              "KAFKA_BATCH_SIZE": "100",
+              "KAFKA_BATCH_TIMEOUT": "5ms",
+              "KAFKA_BROKERS": "kafka:9092",
+              "WATCHER_BATCH_SIZE": "1000"
+            },
+            "image": "distributed-job-scheduler-watcher:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped"
+          }
+        },
+        "volumes": {
+          "grafana-data": {
+            "name": "scheduler-bench_grafana-data"
+          },
+          "kafka-data": {
+            "name": "scheduler-bench_kafka-data"
+          },
+          "postgres-data": {
+            "name": "scheduler-bench_postgres-data"
+          },
+          "prometheus-data": {
+            "name": "scheduler-bench_prometheus-data"
+          },
+          "redis-data": {
+            "name": "scheduler-bench_redis-data"
+          }
+        }
+      }
+    },
+    {
+      "trial": 2,
+      "kind": "experiment",
+      "delta": {
+        "BENCH_AUTOVACUUM_NAPTIME": "10s"
+      },
+      "directory": "20261013T203923Z-57c47a-durable-soak",
+      "decision": "reject",
+      "notes": "Dead tuples reduced, but final backlog grew; throughput and tail latency regressed. All runs eventually reconciled.",
+      "summary": {
+        "scenario": "soak",
+        "accepted_jobs": 1050200,
+        "measurement_accepted_jobs": 900100,
+        "offered_jobs_per_second": 5000,
+        "window_start": 1791924003.811,
+        "window_end": 1791924183.819,
+        "window_seconds": 180.00799989700317,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": 5000.333321380263,
+          "dispatch_jobs_per_second": 5001.422161876864,
+          "successful_jobs_per_second": 4887.438338870443
+        },
+        "start_latency_seconds": {
+          "max": 10.384161,
+          "p50": 0.16332,
+          "p95": 4.464179299999997,
+          "p99": 7.297487640000002,
+          "count": 900100
+        },
+        "drain_seconds": 10.319830894470215,
+        "profile": "durable",
+        "k6_exit_code": 0,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 14.45314463700197,
+        "aborted_for_overload": false,
+        "completed_measurement": true,
+        "execution_counter": {
+          "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+          "window_start": 1791924008.431,
+          "window_end": 1791924183.431,
+          "window_seconds": 175.0,
+          "samples": 36,
+          "successful_executions": 860866.0,
+          "successful_jobs_per_second": 4919.234285714286
+        }
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "1024",
+        "shared_buffers": "16384",
+        "max_connections": "100",
+        "autovacuum_naptime": "10",
+        "synchronous_commit": "on",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "configuration": {
+        "name": "scheduler-bench",
+        "networks": {
+          "default": {
+            "name": "scheduler-bench_default",
+            "ipam": {}
+          }
+        },
+        "services": {
+          "api": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "api"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>",
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "HTTP_ADDR": ":8080",
+              "KAFKA_BROKERS": "kafka:9092",
+              "REDIS_ADDR": "redis:6379"
+            },
+            "image": "distributed-job-scheduler-api:bench",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 8080,
+                "published": "18080",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped"
+          },
+          "echo": {
+            "command": [
+              "-listen=:5678",
+              "-text=ok"
+            ],
+            "entrypoint": null,
+            "image": "hashicorp/http-echo:1.0.0",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped"
+          },
+          "executor": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "executor"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "deploy": {
+              "replicas": 3,
+              "resources": {},
+              "placement": {}
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "EXECUTOR_CONCURRENCY": "10",
+              "HTTP_ADDR": ":8080",
+              "HTTP_ALLOWED_HOSTS": "echo",
+              "KAFKA_BROKERS": "kafka:9092"
+            },
+            "image": "distributed-job-scheduler-executor:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "stop_grace_period": "40s"
+          },
+          "grafana": {
+            "command": null,
+            "depends_on": {
+              "prometheus": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH": "/etc/grafana/dashboards/scheduler.json",
+              "GF_SECURITY_ADMIN_PASSWORD": "<redacted>",
+              "GF_SECURITY_ADMIN_USER": "admin"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "wget",
+                "--spider",
+                "-q",
+                "http://localhost:3000/api/health"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20,
+              "start_period": "20s"
+            },
+            "image": "grafana/grafana:13.2.3",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 3000,
+                "published": "13000",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/grafana/provisioning",
+                "target": "/etc/grafana/provisioning",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/grafana/dashboards",
+                "target": "/etc/grafana/dashboards",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "volume",
+                "source": "grafana-data",
+                "target": "/var/lib/grafana",
+                "volume": {}
+              }
+            ]
+          },
+          "k6": {
+            "profiles": [
+              "tools"
+            ],
+            "command": null,
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>"
+            },
+            "image": "grafana/k6:1.6.1",
+            "networks": {
+              "default": null
+            },
+            "restart": "no",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/test/load",
+                "target": "/scripts",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/docs/bench/results/20261013T203923Z-57c47a-durable-soak",
+                "target": "/results",
+                "bind": {}
+              }
+            ]
+          },
+          "kafka": {
+            "command": null,
+            "entrypoint": null,
+            "environment": {
+              "KAFKA_ADVERTISED_LISTENERS": "PLAINTEXT://kafka:9092",
+              "KAFKA_CONTROLLER_LISTENER_NAMES": "CONTROLLER",
+              "KAFKA_CONTROLLER_QUORUM_VOTERS": "1@kafka:9093",
+              "KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS": "0",
+              "KAFKA_LISTENERS": "PLAINTEXT://:9092,CONTROLLER://:9093",
+              "KAFKA_LISTENER_SECURITY_PROTOCOL_MAP": "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT",
+              "KAFKA_LOG_DIRS": "/var/lib/kafka/data",
+              "KAFKA_NODE_ID": "1",
+              "KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR": "1",
+              "KAFKA_PROCESS_ROLES": "broker,controller",
+              "KAFKA_TRANSACTION_STATE_LOG_MIN_ISR": "1",
+              "KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR": "1"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD-SHELL",
+                "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"
+              ],
+              "timeout": "5s",
+              "interval": "5s",
+              "retries": 30,
+              "start_period": "20s"
+            },
+            "image": "apache/kafka:4.2.2",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "kafka-data",
+                "target": "/var/lib/kafka/data",
+                "volume": {}
+              }
+            ]
+          },
+          "migrate": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "migrate"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "postgres": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable"
+            },
+            "image": "distributed-job-scheduler-migrate:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "postgres": {
+            "command": [
+              "postgres",
+              "-c",
+              "synchronous_commit=on",
+              "-c",
+              "shared_buffers=128MB",
+              "-c",
+              "max_wal_size=1GB",
+              "-c",
+              "fsync=on",
+              "-c",
+              "autovacuum_naptime=10s"
+            ],
+            "entrypoint": null,
+            "environment": {
+              "POSTGRES_DB": "scheduler",
+              "POSTGRES_PASSWORD": "<redacted>",
+              "POSTGRES_USER": "scheduler"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD-SHELL",
+                "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20,
+              "start_period": "10s"
+            },
+            "image": "postgres:18.6-bookworm",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "postgres-data",
+                "target": "/var/lib/postgresql",
+                "volume": {}
+              }
+            ]
+          },
+          "prometheus": {
+            "command": null,
+            "entrypoint": null,
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "wget",
+                "--spider",
+                "-q",
+                "http://localhost:9090/-/ready"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20
+            },
+            "image": "prom/prometheus:v3.15.0",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 9090,
+                "published": "19090",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/prometheus.yml",
+                "target": "/etc/prometheus/prometheus.yml",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "volume",
+                "source": "prometheus-data",
+                "target": "/prometheus",
+                "volume": {}
+              }
+            ]
+          },
+          "redis": {
+            "command": [
+              "redis-server",
+              "--appendonly",
+              "yes"
+            ],
+            "entrypoint": null,
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "redis-cli",
+                "ping"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20
+            },
+            "image": "redis:8.10.2-trixie",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "redis-data",
+                "target": "/data",
+                "volume": {}
+              }
+            ]
+          },
+          "smoke": {
+            "profiles": [
+              "tools"
+            ],
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "smoke"
+              }
+            },
+            "command": [
+              "-api-url=http://api:8080",
+              "-prometheus-url=http://prometheus:9090",
+              "-grafana-url=http://grafana:3000"
+            ],
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>",
+              "GRAFANA_ADMIN_PASSWORD": "<redacted>"
+            },
+            "image": "distributed-job-scheduler-smoke:local",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "topic-init": {
+            "command": [
+              "until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1; do sleep 1; done\n/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic jobs.run --partitions 12 --replication-factor 1\n/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic jobs.dlq --partitions 3 --replication-factor 1\n"
+            ],
+            "depends_on": {
+              "kafka": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": [
+              "/bin/sh",
+              "-ec"
+            ],
+            "image": "apache/kafka:4.2.2",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "watcher": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "watcher"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "deploy": {
+              "replicas": 2,
+              "resources": {},
+              "placement": {}
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "HTTP_ADDR": ":8080",
+              "KAFKA_BATCH_SIZE": "100",
+              "KAFKA_BATCH_TIMEOUT": "5ms",
+              "KAFKA_BROKERS": "kafka:9092",
+              "WATCHER_BATCH_SIZE": "1000"
+            },
+            "image": "distributed-job-scheduler-watcher:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped"
+          }
+        },
+        "volumes": {
+          "grafana-data": {
+            "name": "scheduler-bench_grafana-data"
+          },
+          "kafka-data": {
+            "name": "scheduler-bench_kafka-data"
+          },
+          "postgres-data": {
+            "name": "scheduler-bench_postgres-data"
+          },
+          "prometheus-data": {
+            "name": "scheduler-bench_prometheus-data"
+          },
+          "redis-data": {
+            "name": "scheduler-bench_redis-data"
+          }
+        }
+      }
+    },
+    {
+      "trial": 3,
+      "kind": "experiment",
+      "delta": {
+        "EXECUTOR_CONCURRENCY": 30
+      },
+      "directory": "20261013T205209Z-514b07-durable-soak",
+      "decision": "reject",
+      "notes": "Overload guard interrupted the run after three rising backlog windows; p99 exceeded 10 seconds. Counts reconciled after graceful stopping. DB transition rates do not substitute for backlog and latency evidence.",
+      "summary": {
+        "scenario": "soak",
+        "accepted_jobs": 766100,
+        "measurement_accepted_jobs": 616000,
+        "offered_jobs_per_second": 5000,
+        "window_start": 1791924770.105,
+        "window_end": 1791924893.296,
+        "window_seconds": 123.19099998474121,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": 5000.365287044504,
+          "dispatch_jobs_per_second": 4999.472364671818,
+          "successful_jobs_per_second": 4999.05025591382
+        },
+        "start_latency_seconds": {
+          "max": 11.508914,
+          "p50": 0.158103,
+          "p95": 8.031412699999965,
+          "p99": 10.514879160000001,
+          "count": 616000
+        },
+        "drain_seconds": 0.13843703269958496,
+        "profile": "durable",
+        "k6_exit_code": 105,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 3.3680325409986835,
+        "aborted_for_overload": true,
+        "completed_measurement": false,
+        "execution_counter": {
+          "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+          "window_start": 1791924774.754,
+          "window_end": 1791924889.754,
+          "window_seconds": 115.0,
+          "samples": 24,
+          "successful_executions": 574942.0,
+          "successful_jobs_per_second": 4999.495652173913
+        }
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "1024",
+        "shared_buffers": "16384",
+        "max_connections": "100",
+        "autovacuum_naptime": "60",
+        "synchronous_commit": "on",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "configuration": {
+        "name": "scheduler-bench",
+        "networks": {
+          "default": {
+            "name": "scheduler-bench_default",
+            "ipam": {}
+          }
+        },
+        "services": {
+          "api": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "api"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>",
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "HTTP_ADDR": ":8080",
+              "KAFKA_BROKERS": "kafka:9092",
+              "REDIS_ADDR": "redis:6379"
+            },
+            "image": "distributed-job-scheduler-api:bench",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 8080,
+                "published": "18080",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped"
+          },
+          "echo": {
+            "command": [
+              "-listen=:5678",
+              "-text=ok"
+            ],
+            "entrypoint": null,
+            "image": "hashicorp/http-echo:1.0.0",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped"
+          },
+          "executor": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "executor"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "deploy": {
+              "replicas": 3,
+              "resources": {},
+              "placement": {}
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "EXECUTOR_CONCURRENCY": "30",
+              "HTTP_ADDR": ":8080",
+              "HTTP_ALLOWED_HOSTS": "echo",
+              "KAFKA_BROKERS": "kafka:9092"
+            },
+            "image": "distributed-job-scheduler-executor:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "stop_grace_period": "40s"
+          },
+          "grafana": {
+            "command": null,
+            "depends_on": {
+              "prometheus": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH": "/etc/grafana/dashboards/scheduler.json",
+              "GF_SECURITY_ADMIN_PASSWORD": "<redacted>",
+              "GF_SECURITY_ADMIN_USER": "admin"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "wget",
+                "--spider",
+                "-q",
+                "http://localhost:3000/api/health"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20,
+              "start_period": "20s"
+            },
+            "image": "grafana/grafana:13.2.3",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 3000,
+                "published": "13000",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/grafana/provisioning",
+                "target": "/etc/grafana/provisioning",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/grafana/dashboards",
+                "target": "/etc/grafana/dashboards",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "volume",
+                "source": "grafana-data",
+                "target": "/var/lib/grafana",
+                "volume": {}
+              }
+            ]
+          },
+          "k6": {
+            "profiles": [
+              "tools"
+            ],
+            "command": null,
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>"
+            },
+            "image": "grafana/k6:1.6.1",
+            "networks": {
+              "default": null
+            },
+            "restart": "no",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/test/load",
+                "target": "/scripts",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/docs/bench/results/20261013T205209Z-514b07-durable-soak",
+                "target": "/results",
+                "bind": {}
+              }
+            ]
+          },
+          "kafka": {
+            "command": null,
+            "entrypoint": null,
+            "environment": {
+              "KAFKA_ADVERTISED_LISTENERS": "PLAINTEXT://kafka:9092",
+              "KAFKA_CONTROLLER_LISTENER_NAMES": "CONTROLLER",
+              "KAFKA_CONTROLLER_QUORUM_VOTERS": "1@kafka:9093",
+              "KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS": "0",
+              "KAFKA_LISTENERS": "PLAINTEXT://:9092,CONTROLLER://:9093",
+              "KAFKA_LISTENER_SECURITY_PROTOCOL_MAP": "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT",
+              "KAFKA_LOG_DIRS": "/var/lib/kafka/data",
+              "KAFKA_NODE_ID": "1",
+              "KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR": "1",
+              "KAFKA_PROCESS_ROLES": "broker,controller",
+              "KAFKA_TRANSACTION_STATE_LOG_MIN_ISR": "1",
+              "KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR": "1"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD-SHELL",
+                "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"
+              ],
+              "timeout": "5s",
+              "interval": "5s",
+              "retries": 30,
+              "start_period": "20s"
+            },
+            "image": "apache/kafka:4.2.2",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "kafka-data",
+                "target": "/var/lib/kafka/data",
+                "volume": {}
+              }
+            ]
+          },
+          "migrate": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "migrate"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "postgres": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable"
+            },
+            "image": "distributed-job-scheduler-migrate:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "postgres": {
+            "command": [
+              "postgres",
+              "-c",
+              "synchronous_commit=on",
+              "-c",
+              "shared_buffers=128MB",
+              "-c",
+              "max_wal_size=1GB",
+              "-c",
+              "fsync=on",
+              "-c",
+              "autovacuum_naptime=1min"
+            ],
+            "entrypoint": null,
+            "environment": {
+              "POSTGRES_DB": "scheduler",
+              "POSTGRES_PASSWORD": "<redacted>",
+              "POSTGRES_USER": "scheduler"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD-SHELL",
+                "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20,
+              "start_period": "10s"
+            },
+            "image": "postgres:18.6-bookworm",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "postgres-data",
+                "target": "/var/lib/postgresql",
+                "volume": {}
+              }
+            ]
+          },
+          "prometheus": {
+            "command": null,
+            "entrypoint": null,
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "wget",
+                "--spider",
+                "-q",
+                "http://localhost:9090/-/ready"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20
+            },
+            "image": "prom/prometheus:v3.15.0",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 9090,
+                "published": "19090",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/prometheus.yml",
+                "target": "/etc/prometheus/prometheus.yml",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "volume",
+                "source": "prometheus-data",
+                "target": "/prometheus",
+                "volume": {}
+              }
+            ]
+          },
+          "redis": {
+            "command": [
+              "redis-server",
+              "--appendonly",
+              "yes"
+            ],
+            "entrypoint": null,
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "redis-cli",
+                "ping"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20
+            },
+            "image": "redis:8.10.2-trixie",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "redis-data",
+                "target": "/data",
+                "volume": {}
+              }
+            ]
+          },
+          "smoke": {
+            "profiles": [
+              "tools"
+            ],
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "smoke"
+              }
+            },
+            "command": [
+              "-api-url=http://api:8080",
+              "-prometheus-url=http://prometheus:9090",
+              "-grafana-url=http://grafana:3000"
+            ],
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>",
+              "GRAFANA_ADMIN_PASSWORD": "<redacted>"
+            },
+            "image": "distributed-job-scheduler-smoke:local",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "topic-init": {
+            "command": [
+              "until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1; do sleep 1; done\n/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic jobs.run --partitions 12 --replication-factor 1\n/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic jobs.dlq --partitions 3 --replication-factor 1\n"
+            ],
+            "depends_on": {
+              "kafka": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": [
+              "/bin/sh",
+              "-ec"
+            ],
+            "image": "apache/kafka:4.2.2",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "watcher": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "watcher"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "deploy": {
+              "replicas": 2,
+              "resources": {},
+              "placement": {}
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "HTTP_ADDR": ":8080",
+              "KAFKA_BATCH_SIZE": "100",
+              "KAFKA_BATCH_TIMEOUT": "5ms",
+              "KAFKA_BROKERS": "kafka:9092",
+              "WATCHER_BATCH_SIZE": "1000"
+            },
+            "image": "distributed-job-scheduler-watcher:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped"
+          }
+        },
+        "volumes": {
+          "grafana-data": {
+            "name": "scheduler-bench_grafana-data"
+          },
+          "kafka-data": {
+            "name": "scheduler-bench_kafka-data"
+          },
+          "postgres-data": {
+            "name": "scheduler-bench_postgres-data"
+          },
+          "prometheus-data": {
+            "name": "scheduler-bench_prometheus-data"
+          },
+          "redis-data": {
+            "name": "scheduler-bench_redis-data"
+          }
+        }
+      }
+    },
+    {
+      "trial": 4,
+      "kind": "experiment",
+      "delta": {
+        "BENCH_MAX_WAL_SIZE": "4GB"
+      },
+      "directory": "20261013T210733Z-95ba58-durable-soak",
+      "decision": "reject",
+      "notes": "Overload, p99 48.9s. EXPLAIN shows point UPDATE switched to full QUEUED partial-index scan after statistics refresh; larger WAL allowance does not address that SQL bottleneck. Initial registry DNS build failure produced no measured run and did not stop development services.",
+      "summary": {
+        "scenario": "soak",
+        "accepted_jobs": 767100,
+        "measurement_accepted_jobs": 617000,
+        "offered_jobs_per_second": 5000,
+        "window_start": 1791925694.134,
+        "window_end": 1791925817.52,
+        "window_seconds": 123.38599991798401,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": 5000.56732862826,
+          "dispatch_jobs_per_second": 5001.377793349269,
+          "successful_jobs_per_second": 3244.5172083226807
+        },
+        "start_latency_seconds": {
+          "max": 49.340746,
+          "p50": 37.792837500000005,
+          "p95": 47.99360125,
+          "p99": 48.888575120000006,
+          "count": 617000
+        },
+        "drain_seconds": 35.99974012374878,
+        "profile": "durable",
+        "k6_exit_code": 105,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 23.61997331999737,
+        "aborted_for_overload": true,
+        "completed_measurement": false,
+        "execution_counter": {
+          "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+          "window_start": 1791925698.732,
+          "window_end": 1791925813.732,
+          "window_seconds": 115.0,
+          "samples": 24,
+          "successful_executions": 351843.0,
+          "successful_jobs_per_second": 3059.504347826087
+        }
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "4096",
+        "shared_buffers": "16384",
+        "max_connections": "100",
+        "autovacuum_naptime": "60",
+        "synchronous_commit": "on",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "configuration": {
+        "name": "scheduler-bench",
+        "networks": {
+          "default": {
+            "name": "scheduler-bench_default",
+            "ipam": {}
+          }
+        },
+        "services": {
+          "api": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "api"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>",
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "HTTP_ADDR": ":8080",
+              "KAFKA_BROKERS": "kafka:9092",
+              "REDIS_ADDR": "redis:6379"
+            },
+            "image": "distributed-job-scheduler-api:bench",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 8080,
+                "published": "18080",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped"
+          },
+          "echo": {
+            "command": [
+              "-listen=:5678",
+              "-text=ok"
+            ],
+            "entrypoint": null,
+            "image": "hashicorp/http-echo:1.0.0",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped"
+          },
+          "executor": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "executor"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "deploy": {
+              "replicas": 3,
+              "resources": {},
+              "placement": {}
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "EXECUTOR_CONCURRENCY": "10",
+              "HTTP_ADDR": ":8080",
+              "HTTP_ALLOWED_HOSTS": "echo",
+              "KAFKA_BROKERS": "kafka:9092"
+            },
+            "image": "distributed-job-scheduler-executor:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "stop_grace_period": "40s"
+          },
+          "grafana": {
+            "command": null,
+            "depends_on": {
+              "prometheus": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH": "/etc/grafana/dashboards/scheduler.json",
+              "GF_SECURITY_ADMIN_PASSWORD": "<redacted>",
+              "GF_SECURITY_ADMIN_USER": "admin"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "wget",
+                "--spider",
+                "-q",
+                "http://localhost:3000/api/health"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20,
+              "start_period": "20s"
+            },
+            "image": "grafana/grafana:13.2.3",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 3000,
+                "published": "13000",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/grafana/provisioning",
+                "target": "/etc/grafana/provisioning",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/grafana/dashboards",
+                "target": "/etc/grafana/dashboards",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "volume",
+                "source": "grafana-data",
+                "target": "/var/lib/grafana",
+                "volume": {}
+              }
+            ]
+          },
+          "k6": {
+            "profiles": [
+              "tools"
+            ],
+            "command": null,
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>"
+            },
+            "image": "grafana/k6:1.6.1",
+            "networks": {
+              "default": null
+            },
+            "restart": "no",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/test/load",
+                "target": "/scripts",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/docs/bench/results/20261013T210733Z-95ba58-durable-soak",
+                "target": "/results",
+                "bind": {}
+              }
+            ]
+          },
+          "kafka": {
+            "command": null,
+            "entrypoint": null,
+            "environment": {
+              "KAFKA_ADVERTISED_LISTENERS": "PLAINTEXT://kafka:9092",
+              "KAFKA_CONTROLLER_LISTENER_NAMES": "CONTROLLER",
+              "KAFKA_CONTROLLER_QUORUM_VOTERS": "1@kafka:9093",
+              "KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS": "0",
+              "KAFKA_LISTENERS": "PLAINTEXT://:9092,CONTROLLER://:9093",
+              "KAFKA_LISTENER_SECURITY_PROTOCOL_MAP": "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT",
+              "KAFKA_LOG_DIRS": "/var/lib/kafka/data",
+              "KAFKA_NODE_ID": "1",
+              "KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR": "1",
+              "KAFKA_PROCESS_ROLES": "broker,controller",
+              "KAFKA_TRANSACTION_STATE_LOG_MIN_ISR": "1",
+              "KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR": "1"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD-SHELL",
+                "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"
+              ],
+              "timeout": "5s",
+              "interval": "5s",
+              "retries": 30,
+              "start_period": "20s"
+            },
+            "image": "apache/kafka:4.2.2",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "kafka-data",
+                "target": "/var/lib/kafka/data",
+                "volume": {}
+              }
+            ]
+          },
+          "migrate": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "migrate"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "postgres": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable"
+            },
+            "image": "distributed-job-scheduler-migrate:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "postgres": {
+            "command": [
+              "postgres",
+              "-c",
+              "synchronous_commit=on",
+              "-c",
+              "shared_buffers=128MB",
+              "-c",
+              "max_wal_size=4GB",
+              "-c",
+              "fsync=on",
+              "-c",
+              "autovacuum_naptime=1min"
+            ],
+            "entrypoint": null,
+            "environment": {
+              "POSTGRES_DB": "scheduler",
+              "POSTGRES_PASSWORD": "<redacted>",
+              "POSTGRES_USER": "scheduler"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD-SHELL",
+                "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20,
+              "start_period": "10s"
+            },
+            "image": "postgres:18.6-bookworm",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "postgres-data",
+                "target": "/var/lib/postgresql",
+                "volume": {}
+              }
+            ]
+          },
+          "prometheus": {
+            "command": null,
+            "entrypoint": null,
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "wget",
+                "--spider",
+                "-q",
+                "http://localhost:9090/-/ready"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20
+            },
+            "image": "prom/prometheus:v3.15.0",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 9090,
+                "published": "19090",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/prometheus.yml",
+                "target": "/etc/prometheus/prometheus.yml",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "volume",
+                "source": "prometheus-data",
+                "target": "/prometheus",
+                "volume": {}
+              }
+            ]
+          },
+          "redis": {
+            "command": [
+              "redis-server",
+              "--appendonly",
+              "yes"
+            ],
+            "entrypoint": null,
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "redis-cli",
+                "ping"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20
+            },
+            "image": "redis:8.10.2-trixie",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "redis-data",
+                "target": "/data",
+                "volume": {}
+              }
+            ]
+          },
+          "smoke": {
+            "profiles": [
+              "tools"
+            ],
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "smoke"
+              }
+            },
+            "command": [
+              "-api-url=http://api:8080",
+              "-prometheus-url=http://prometheus:9090",
+              "-grafana-url=http://grafana:3000"
+            ],
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>",
+              "GRAFANA_ADMIN_PASSWORD": "<redacted>"
+            },
+            "image": "distributed-job-scheduler-smoke:local",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "topic-init": {
+            "command": [
+              "until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1; do sleep 1; done\n/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic jobs.run --partitions 12 --replication-factor 1\n/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic jobs.dlq --partitions 3 --replication-factor 1\n"
+            ],
+            "depends_on": {
+              "kafka": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": [
+              "/bin/sh",
+              "-ec"
+            ],
+            "image": "apache/kafka:4.2.2",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "watcher": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "watcher"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "deploy": {
+              "replicas": 2,
+              "resources": {},
+              "placement": {}
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "HTTP_ADDR": ":8080",
+              "KAFKA_BATCH_SIZE": "100",
+              "KAFKA_BATCH_TIMEOUT": "5ms",
+              "KAFKA_BROKERS": "kafka:9092",
+              "WATCHER_BATCH_SIZE": "1000"
+            },
+            "image": "distributed-job-scheduler-watcher:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped"
+          }
+        },
+        "volumes": {
+          "grafana-data": {
+            "name": "scheduler-bench_grafana-data"
+          },
+          "kafka-data": {
+            "name": "scheduler-bench_kafka-data"
+          },
+          "postgres-data": {
+            "name": "scheduler-bench_postgres-data"
+          },
+          "prometheus-data": {
+            "name": "scheduler-bench_prometheus-data"
+          },
+          "redis-data": {
+            "name": "scheduler-bench_redis-data"
+          }
+        }
+      }
+    },
+    {
+      "trial": 5,
+      "kind": "reference",
+      "delta": {},
+      "directory": "20261013T211345Z-c62712-durable-herd",
+      "decision": "reference",
+      "notes": "Fresh old-runtime 50k herd reproduces queued-index filtering by run ID; drained in39.6s and reconciled.",
+      "summary": {
+        "scenario": "herd",
+        "accepted_jobs": 50000,
+        "measurement_accepted_jobs": 50000,
+        "offered_jobs_per_second": null,
+        "window_start": 1791926065.578,
+        "window_end": 1791926105.176912,
+        "window_seconds": 39.59891200065613,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": null,
+          "dispatch_jobs_per_second": 23331.823234809046,
+          "successful_jobs_per_second": 1262.6609538961964
+        },
+        "start_latency_seconds": {
+          "max": 39.597554,
+          "p50": 35.4142205,
+          "p95": 39.1001709,
+          "p99": 39.439369129999996,
+          "count": 50000
+        },
+        "drain_seconds": 39.59891200065613,
+        "profile": "durable",
+        "k6_exit_code": 0,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 41.49965279300159,
+        "aborted_for_overload": false,
+        "completed_measurement": true,
+        "execution_counter": {
+          "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+          "window_start": 1791926070.23,
+          "window_end": 1791926100.23,
+          "window_seconds": 30.0,
+          "samples": 7,
+          "successful_executions": 19056.0,
+          "successful_jobs_per_second": 635.2
+        }
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "1024",
+        "shared_buffers": "16384",
+        "max_connections": "100",
+        "autovacuum_naptime": "60",
+        "synchronous_commit": "on",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "configuration": {
+        "name": "scheduler-bench",
+        "networks": {
+          "default": {
+            "name": "scheduler-bench_default",
+            "ipam": {}
+          }
+        },
+        "services": {
+          "api": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "api"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>",
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "HTTP_ADDR": ":8080",
+              "KAFKA_BROKERS": "kafka:9092",
+              "REDIS_ADDR": "redis:6379"
+            },
+            "image": "distributed-job-scheduler-api:bench",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 8080,
+                "published": "18080",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped"
+          },
+          "echo": {
+            "command": [
+              "-listen=:5678",
+              "-text=ok"
+            ],
+            "entrypoint": null,
+            "image": "hashicorp/http-echo:1.0.0",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped"
+          },
+          "executor": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "executor"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "deploy": {
+              "replicas": 3,
+              "resources": {},
+              "placement": {}
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "EXECUTOR_CONCURRENCY": "10",
+              "HTTP_ADDR": ":8080",
+              "HTTP_ALLOWED_HOSTS": "echo",
+              "KAFKA_BROKERS": "kafka:9092"
+            },
+            "image": "distributed-job-scheduler-executor:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "stop_grace_period": "40s"
+          },
+          "grafana": {
+            "command": null,
+            "depends_on": {
+              "prometheus": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH": "/etc/grafana/dashboards/scheduler.json",
+              "GF_SECURITY_ADMIN_PASSWORD": "<redacted>",
+              "GF_SECURITY_ADMIN_USER": "admin"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "wget",
+                "--spider",
+                "-q",
+                "http://localhost:3000/api/health"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20,
+              "start_period": "20s"
+            },
+            "image": "grafana/grafana:13.2.3",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 3000,
+                "published": "13000",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/grafana/provisioning",
+                "target": "/etc/grafana/provisioning",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/grafana/dashboards",
+                "target": "/etc/grafana/dashboards",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "volume",
+                "source": "grafana-data",
+                "target": "/var/lib/grafana",
+                "volume": {}
+              }
+            ]
+          },
+          "k6": {
+            "profiles": [
+              "tools"
+            ],
+            "command": null,
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>"
+            },
+            "image": "grafana/k6:1.6.1",
+            "networks": {
+              "default": null
+            },
+            "restart": "no",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/test/load",
+                "target": "/scripts",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/docs/bench/results/20261013T211345Z-c62712-durable-herd",
+                "target": "/results",
+                "bind": {}
+              }
+            ]
+          },
+          "kafka": {
+            "command": null,
+            "entrypoint": null,
+            "environment": {
+              "KAFKA_ADVERTISED_LISTENERS": "PLAINTEXT://kafka:9092",
+              "KAFKA_CONTROLLER_LISTENER_NAMES": "CONTROLLER",
+              "KAFKA_CONTROLLER_QUORUM_VOTERS": "1@kafka:9093",
+              "KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS": "0",
+              "KAFKA_LISTENERS": "PLAINTEXT://:9092,CONTROLLER://:9093",
+              "KAFKA_LISTENER_SECURITY_PROTOCOL_MAP": "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT",
+              "KAFKA_LOG_DIRS": "/var/lib/kafka/data",
+              "KAFKA_NODE_ID": "1",
+              "KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR": "1",
+              "KAFKA_PROCESS_ROLES": "broker,controller",
+              "KAFKA_TRANSACTION_STATE_LOG_MIN_ISR": "1",
+              "KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR": "1"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD-SHELL",
+                "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"
+              ],
+              "timeout": "5s",
+              "interval": "5s",
+              "retries": 30,
+              "start_period": "20s"
+            },
+            "image": "apache/kafka:4.2.2",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "kafka-data",
+                "target": "/var/lib/kafka/data",
+                "volume": {}
+              }
+            ]
+          },
+          "migrate": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "migrate"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "postgres": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable"
+            },
+            "image": "distributed-job-scheduler-migrate:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "postgres": {
+            "command": [
+              "postgres",
+              "-c",
+              "synchronous_commit=on",
+              "-c",
+              "shared_buffers=128MB",
+              "-c",
+              "max_wal_size=1GB",
+              "-c",
+              "fsync=on",
+              "-c",
+              "autovacuum_naptime=1min"
+            ],
+            "entrypoint": null,
+            "environment": {
+              "POSTGRES_DB": "scheduler",
+              "POSTGRES_PASSWORD": "<redacted>",
+              "POSTGRES_USER": "scheduler"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD-SHELL",
+                "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20,
+              "start_period": "10s"
+            },
+            "image": "postgres:18.6-bookworm",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "postgres-data",
+                "target": "/var/lib/postgresql",
+                "volume": {}
+              }
+            ]
+          },
+          "prometheus": {
+            "command": null,
+            "entrypoint": null,
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "wget",
+                "--spider",
+                "-q",
+                "http://localhost:9090/-/ready"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20
+            },
+            "image": "prom/prometheus:v3.15.0",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 9090,
+                "published": "19090",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/prometheus.yml",
+                "target": "/etc/prometheus/prometheus.yml",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "volume",
+                "source": "prometheus-data",
+                "target": "/prometheus",
+                "volume": {}
+              }
+            ]
+          },
+          "redis": {
+            "command": [
+              "redis-server",
+              "--appendonly",
+              "yes"
+            ],
+            "entrypoint": null,
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "redis-cli",
+                "ping"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20
+            },
+            "image": "redis:8.10.2-trixie",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "redis-data",
+                "target": "/data",
+                "volume": {}
+              }
+            ]
+          },
+          "smoke": {
+            "profiles": [
+              "tools"
+            ],
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "smoke"
+              }
+            },
+            "command": [
+              "-api-url=http://api:8080",
+              "-prometheus-url=http://prometheus:9090",
+              "-grafana-url=http://grafana:3000"
+            ],
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>",
+              "GRAFANA_ADMIN_PASSWORD": "<redacted>"
+            },
+            "image": "distributed-job-scheduler-smoke:local",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "topic-init": {
+            "command": [
+              "until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1; do sleep 1; done\n/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic jobs.run --partitions 12 --replication-factor 1\n/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic jobs.dlq --partitions 3 --replication-factor 1\n"
+            ],
+            "depends_on": {
+              "kafka": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": [
+              "/bin/sh",
+              "-ec"
+            ],
+            "image": "apache/kafka:4.2.2",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "watcher": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "watcher"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "deploy": {
+              "replicas": 2,
+              "resources": {},
+              "placement": {}
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "HTTP_ADDR": ":8080",
+              "KAFKA_BATCH_SIZE": "100",
+              "KAFKA_BATCH_TIMEOUT": "5ms",
+              "KAFKA_BROKERS": "kafka:9092",
+              "WATCHER_BATCH_SIZE": "1000"
+            },
+            "image": "distributed-job-scheduler-watcher:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped"
+          }
+        },
+        "volumes": {
+          "grafana-data": {
+            "name": "scheduler-bench_grafana-data"
+          },
+          "kafka-data": {
+            "name": "scheduler-bench_kafka-data"
+          },
+          "postgres-data": {
+            "name": "scheduler-bench_postgres-data"
+          },
+          "prometheus-data": {
+            "name": "scheduler-bench_prometheus-data"
+          },
+          "redis-data": {
+            "name": "scheduler-bench_redis-data"
+          }
+        }
+      }
+    },
+    {
+      "trial": 6,
+      "kind": "experiment",
+      "delta": {
+        "runtime": "primary-key-first StartRuns CTE with candidate FOR UPDATE"
+      },
+      "directory": "20261013T212709Z-d8487d-durable-herd",
+      "decision": "retain after trial7 repeat",
+      "notes": "50k herd drain9.0s versus old39.6s; reconciled. Original status-index plan and new primary-key plans captured side by side. Short scrape window cannot produce a reliable execution counter rate.",
+      "summary": {
+        "scenario": "herd",
+        "accepted_jobs": 50000,
+        "measurement_accepted_jobs": 50000,
+        "offered_jobs_per_second": null,
+        "window_start": 1791926870.315,
+        "window_end": 1791926879.311649,
+        "window_seconds": 8.996649026870728,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": null,
+          "dispatch_jobs_per_second": 20648.665722233447,
+          "successful_jobs_per_second": 5557.624827940112
+        },
+        "start_latency_seconds": {
+          "max": 8.994711,
+          "p50": 4.8061229999999995,
+          "p95": 8.532859499999999,
+          "p99": 8.86516959,
+          "count": 50000
+        },
+        "drain_seconds": 8.996649026870728,
+        "profile": "durable",
+        "k6_exit_code": 0,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 10.74002163700061,
+        "aborted_for_overload": false,
+        "completed_measurement": true,
+        "execution_counter": null
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "1024",
+        "shared_buffers": "16384",
+        "max_connections": "100",
+        "autovacuum_naptime": "60",
+        "synchronous_commit": "on",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "configuration": {
+        "name": "scheduler-bench",
+        "networks": {
+          "default": {
+            "name": "scheduler-bench_default",
+            "ipam": {}
+          }
+        },
+        "services": {
+          "api": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "api"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>",
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "HTTP_ADDR": ":8080",
+              "KAFKA_BROKERS": "kafka:9092",
+              "REDIS_ADDR": "redis:6379"
+            },
+            "image": "distributed-job-scheduler-api:bench",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 8080,
+                "published": "18080",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped"
+          },
+          "echo": {
+            "command": [
+              "-listen=:5678",
+              "-text=ok"
+            ],
+            "entrypoint": null,
+            "image": "hashicorp/http-echo:1.0.0",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped"
+          },
+          "executor": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "executor"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "deploy": {
+              "replicas": 3,
+              "resources": {},
+              "placement": {}
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "EXECUTOR_CONCURRENCY": "10",
+              "HTTP_ADDR": ":8080",
+              "HTTP_ALLOWED_HOSTS": "echo",
+              "KAFKA_BROKERS": "kafka:9092"
+            },
+            "image": "distributed-job-scheduler-executor:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "stop_grace_period": "40s"
+          },
+          "grafana": {
+            "command": null,
+            "depends_on": {
+              "prometheus": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH": "/etc/grafana/dashboards/scheduler.json",
+              "GF_SECURITY_ADMIN_PASSWORD": "<redacted>",
+              "GF_SECURITY_ADMIN_USER": "admin"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "wget",
+                "--spider",
+                "-q",
+                "http://localhost:3000/api/health"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20,
+              "start_period": "20s"
+            },
+            "image": "grafana/grafana:13.2.3",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 3000,
+                "published": "13000",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/grafana/provisioning",
+                "target": "/etc/grafana/provisioning",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/grafana/dashboards",
+                "target": "/etc/grafana/dashboards",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "volume",
+                "source": "grafana-data",
+                "target": "/var/lib/grafana",
+                "volume": {}
+              }
+            ]
+          },
+          "k6": {
+            "profiles": [
+              "tools"
+            ],
+            "command": null,
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>"
+            },
+            "image": "grafana/k6:1.6.1",
+            "networks": {
+              "default": null
+            },
+            "restart": "no",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/test/load",
+                "target": "/scripts",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/docs/bench/results/20261013T212709Z-d8487d-durable-herd",
+                "target": "/results",
+                "bind": {}
+              }
+            ]
+          },
+          "kafka": {
+            "command": null,
+            "entrypoint": null,
+            "environment": {
+              "KAFKA_ADVERTISED_LISTENERS": "PLAINTEXT://kafka:9092",
+              "KAFKA_CONTROLLER_LISTENER_NAMES": "CONTROLLER",
+              "KAFKA_CONTROLLER_QUORUM_VOTERS": "1@kafka:9093",
+              "KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS": "0",
+              "KAFKA_LISTENERS": "PLAINTEXT://:9092,CONTROLLER://:9093",
+              "KAFKA_LISTENER_SECURITY_PROTOCOL_MAP": "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT",
+              "KAFKA_LOG_DIRS": "/var/lib/kafka/data",
+              "KAFKA_NODE_ID": "1",
+              "KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR": "1",
+              "KAFKA_PROCESS_ROLES": "broker,controller",
+              "KAFKA_TRANSACTION_STATE_LOG_MIN_ISR": "1",
+              "KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR": "1"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD-SHELL",
+                "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"
+              ],
+              "timeout": "5s",
+              "interval": "5s",
+              "retries": 30,
+              "start_period": "20s"
+            },
+            "image": "apache/kafka:4.2.2",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "kafka-data",
+                "target": "/var/lib/kafka/data",
+                "volume": {}
+              }
+            ]
+          },
+          "migrate": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "migrate"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "postgres": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable"
+            },
+            "image": "distributed-job-scheduler-migrate:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "postgres": {
+            "command": [
+              "postgres",
+              "-c",
+              "synchronous_commit=on",
+              "-c",
+              "shared_buffers=128MB",
+              "-c",
+              "max_wal_size=1GB",
+              "-c",
+              "fsync=on",
+              "-c",
+              "autovacuum_naptime=1min"
+            ],
+            "entrypoint": null,
+            "environment": {
+              "POSTGRES_DB": "scheduler",
+              "POSTGRES_PASSWORD": "<redacted>",
+              "POSTGRES_USER": "scheduler"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD-SHELL",
+                "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20,
+              "start_period": "10s"
+            },
+            "image": "postgres:18.6-bookworm",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "postgres-data",
+                "target": "/var/lib/postgresql",
+                "volume": {}
+              }
+            ]
+          },
+          "prometheus": {
+            "command": null,
+            "entrypoint": null,
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "wget",
+                "--spider",
+                "-q",
+                "http://localhost:9090/-/ready"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20
+            },
+            "image": "prom/prometheus:v3.15.0",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 9090,
+                "published": "19090",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/prometheus.yml",
+                "target": "/etc/prometheus/prometheus.yml",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "volume",
+                "source": "prometheus-data",
+                "target": "/prometheus",
+                "volume": {}
+              }
+            ]
+          },
+          "redis": {
+            "command": [
+              "redis-server",
+              "--appendonly",
+              "yes"
+            ],
+            "entrypoint": null,
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "redis-cli",
+                "ping"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20
+            },
+            "image": "redis:8.10.2-trixie",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "redis-data",
+                "target": "/data",
+                "volume": {}
+              }
+            ]
+          },
+          "smoke": {
+            "profiles": [
+              "tools"
+            ],
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "smoke"
+              }
+            },
+            "command": [
+              "-api-url=http://api:8080",
+              "-prometheus-url=http://prometheus:9090",
+              "-grafana-url=http://grafana:3000"
+            ],
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>",
+              "GRAFANA_ADMIN_PASSWORD": "<redacted>"
+            },
+            "image": "distributed-job-scheduler-smoke:local",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "topic-init": {
+            "command": [
+              "until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1; do sleep 1; done\n/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic jobs.run --partitions 12 --replication-factor 1\n/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic jobs.dlq --partitions 3 --replication-factor 1\n"
+            ],
+            "depends_on": {
+              "kafka": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": [
+              "/bin/sh",
+              "-ec"
+            ],
+            "image": "apache/kafka:4.2.2",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "watcher": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "watcher"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "deploy": {
+              "replicas": 2,
+              "resources": {},
+              "placement": {}
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "HTTP_ADDR": ":8080",
+              "KAFKA_BATCH_SIZE": "100",
+              "KAFKA_BATCH_TIMEOUT": "5ms",
+              "KAFKA_BROKERS": "kafka:9092",
+              "WATCHER_BATCH_SIZE": "1000"
+            },
+            "image": "distributed-job-scheduler-watcher:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped"
+          }
+        },
+        "volumes": {
+          "grafana-data": {
+            "name": "scheduler-bench_grafana-data"
+          },
+          "kafka-data": {
+            "name": "scheduler-bench_kafka-data"
+          },
+          "postgres-data": {
+            "name": "scheduler-bench_postgres-data"
+          },
+          "prometheus-data": {
+            "name": "scheduler-bench_prometheus-data"
+          },
+          "redis-data": {
+            "name": "scheduler-bench_redis-data"
+          }
+        }
+      }
+    },
+    {
+      "trial": 7,
+      "kind": "repeat",
+      "delta": {
+        "runtime": "primary-key-first StartRuns CTE with candidate FOR UPDATE"
+      },
+      "directory": "20261013T212921Z-ef77b2-durable-herd",
+      "decision": "retain",
+      "notes": "Repeat drain9.09s versus old39.6s; all50k first attempts reconcile. Improved burst p99 remains above2s.",
+      "summary": {
+        "scenario": "herd",
+        "accepted_jobs": 50000,
+        "measurement_accepted_jobs": 50000,
+        "offered_jobs_per_second": null,
+        "window_start": 1791927001.916,
+        "window_end": 1791927011.004557,
+        "window_seconds": 9.088557004928589,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": null,
+          "dispatch_jobs_per_second": 20865.516914419673,
+          "successful_jobs_per_second": 5501.423380288614
+        },
+        "start_latency_seconds": {
+          "max": 9.087146,
+          "p50": 4.8118955,
+          "p95": 8.60172255,
+          "p99": 8.925163229999999,
+          "count": 50000
+        },
+        "drain_seconds": 9.088557004928589,
+        "profile": "durable",
+        "k6_exit_code": 0,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 10.726546918998793,
+        "aborted_for_overload": false,
+        "completed_measurement": true,
+        "execution_counter": null
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "1024",
+        "shared_buffers": "16384",
+        "max_connections": "100",
+        "autovacuum_naptime": "60",
+        "synchronous_commit": "on",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "configuration": {
+        "name": "scheduler-bench",
+        "networks": {
+          "default": {
+            "name": "scheduler-bench_default",
+            "ipam": {}
+          }
+        },
+        "services": {
+          "api": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "api"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>",
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "HTTP_ADDR": ":8080",
+              "KAFKA_BROKERS": "kafka:9092",
+              "REDIS_ADDR": "redis:6379"
+            },
+            "image": "distributed-job-scheduler-api:bench",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 8080,
+                "published": "18080",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped"
+          },
+          "echo": {
+            "command": [
+              "-listen=:5678",
+              "-text=ok"
+            ],
+            "entrypoint": null,
+            "image": "hashicorp/http-echo:1.0.0",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped"
+          },
+          "executor": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "executor"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "deploy": {
+              "replicas": 3,
+              "resources": {},
+              "placement": {}
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "EXECUTOR_CONCURRENCY": "10",
+              "HTTP_ADDR": ":8080",
+              "HTTP_ALLOWED_HOSTS": "echo",
+              "KAFKA_BROKERS": "kafka:9092"
+            },
+            "image": "distributed-job-scheduler-executor:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "stop_grace_period": "40s"
+          },
+          "grafana": {
+            "command": null,
+            "depends_on": {
+              "prometheus": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH": "/etc/grafana/dashboards/scheduler.json",
+              "GF_SECURITY_ADMIN_PASSWORD": "<redacted>",
+              "GF_SECURITY_ADMIN_USER": "admin"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "wget",
+                "--spider",
+                "-q",
+                "http://localhost:3000/api/health"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20,
+              "start_period": "20s"
+            },
+            "image": "grafana/grafana:13.2.3",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 3000,
+                "published": "13000",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/grafana/provisioning",
+                "target": "/etc/grafana/provisioning",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/grafana/dashboards",
+                "target": "/etc/grafana/dashboards",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "volume",
+                "source": "grafana-data",
+                "target": "/var/lib/grafana",
+                "volume": {}
+              }
+            ]
+          },
+          "k6": {
+            "profiles": [
+              "tools"
+            ],
+            "command": null,
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>"
+            },
+            "image": "grafana/k6:1.6.1",
+            "networks": {
+              "default": null
+            },
+            "restart": "no",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/test/load",
+                "target": "/scripts",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/docs/bench/results/20261013T212921Z-ef77b2-durable-herd",
+                "target": "/results",
+                "bind": {}
+              }
+            ]
+          },
+          "kafka": {
+            "command": null,
+            "entrypoint": null,
+            "environment": {
+              "KAFKA_ADVERTISED_LISTENERS": "PLAINTEXT://kafka:9092",
+              "KAFKA_CONTROLLER_LISTENER_NAMES": "CONTROLLER",
+              "KAFKA_CONTROLLER_QUORUM_VOTERS": "1@kafka:9093",
+              "KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS": "0",
+              "KAFKA_LISTENERS": "PLAINTEXT://:9092,CONTROLLER://:9093",
+              "KAFKA_LISTENER_SECURITY_PROTOCOL_MAP": "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT",
+              "KAFKA_LOG_DIRS": "/var/lib/kafka/data",
+              "KAFKA_NODE_ID": "1",
+              "KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR": "1",
+              "KAFKA_PROCESS_ROLES": "broker,controller",
+              "KAFKA_TRANSACTION_STATE_LOG_MIN_ISR": "1",
+              "KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR": "1"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD-SHELL",
+                "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"
+              ],
+              "timeout": "5s",
+              "interval": "5s",
+              "retries": 30,
+              "start_period": "20s"
+            },
+            "image": "apache/kafka:4.2.2",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "kafka-data",
+                "target": "/var/lib/kafka/data",
+                "volume": {}
+              }
+            ]
+          },
+          "migrate": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "migrate"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "postgres": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable"
+            },
+            "image": "distributed-job-scheduler-migrate:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "postgres": {
+            "command": [
+              "postgres",
+              "-c",
+              "synchronous_commit=on",
+              "-c",
+              "shared_buffers=128MB",
+              "-c",
+              "max_wal_size=1GB",
+              "-c",
+              "fsync=on",
+              "-c",
+              "autovacuum_naptime=1min"
+            ],
+            "entrypoint": null,
+            "environment": {
+              "POSTGRES_DB": "scheduler",
+              "POSTGRES_PASSWORD": "<redacted>",
+              "POSTGRES_USER": "scheduler"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD-SHELL",
+                "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20,
+              "start_period": "10s"
+            },
+            "image": "postgres:18.6-bookworm",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "postgres-data",
+                "target": "/var/lib/postgresql",
+                "volume": {}
+              }
+            ]
+          },
+          "prometheus": {
+            "command": null,
+            "entrypoint": null,
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "wget",
+                "--spider",
+                "-q",
+                "http://localhost:9090/-/ready"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20
+            },
+            "image": "prom/prometheus:v3.15.0",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 9090,
+                "published": "19090",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/prometheus.yml",
+                "target": "/etc/prometheus/prometheus.yml",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "volume",
+                "source": "prometheus-data",
+                "target": "/prometheus",
+                "volume": {}
+              }
+            ]
+          },
+          "redis": {
+            "command": [
+              "redis-server",
+              "--appendonly",
+              "yes"
+            ],
+            "entrypoint": null,
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "redis-cli",
+                "ping"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20
+            },
+            "image": "redis:8.10.2-trixie",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "redis-data",
+                "target": "/data",
+                "volume": {}
+              }
+            ]
+          },
+          "smoke": {
+            "profiles": [
+              "tools"
+            ],
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "smoke"
+              }
+            },
+            "command": [
+              "-api-url=http://api:8080",
+              "-prometheus-url=http://prometheus:9090",
+              "-grafana-url=http://grafana:3000"
+            ],
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>",
+              "GRAFANA_ADMIN_PASSWORD": "<redacted>"
+            },
+            "image": "distributed-job-scheduler-smoke:local",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "topic-init": {
+            "command": [
+              "until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1; do sleep 1; done\n/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic jobs.run --partitions 12 --replication-factor 1\n/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic jobs.dlq --partitions 3 --replication-factor 1\n"
+            ],
+            "depends_on": {
+              "kafka": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": [
+              "/bin/sh",
+              "-ec"
+            ],
+            "image": "apache/kafka:4.2.2",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "watcher": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "watcher"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "deploy": {
+              "replicas": 2,
+              "resources": {},
+              "placement": {}
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "HTTP_ADDR": ":8080",
+              "KAFKA_BATCH_SIZE": "100",
+              "KAFKA_BATCH_TIMEOUT": "5ms",
+              "KAFKA_BROKERS": "kafka:9092",
+              "WATCHER_BATCH_SIZE": "1000"
+            },
+            "image": "distributed-job-scheduler-watcher:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped"
+          }
+        },
+        "volumes": {
+          "grafana-data": {
+            "name": "scheduler-bench_grafana-data"
+          },
+          "kafka-data": {
+            "name": "scheduler-bench_kafka-data"
+          },
+          "postgres-data": {
+            "name": "scheduler-bench_postgres-data"
+          },
+          "prometheus-data": {
+            "name": "scheduler-bench_prometheus-data"
+          },
+          "redis-data": {
+            "name": "scheduler-bench_redis-data"
+          }
+        }
+      }
+    },
+    {
+      "trial": 8,
+      "kind": "confirmation of short experiment",
+      "delta": {
+        "runtime": "primary-key-first StartRuns CTE with candidate FOR UPDATE"
+      },
+      "directory": "20261013T213133Z-d92038-durable-soak",
+      "decision": "retain",
+      "notes": "Full180s at5k/s reconciled; p99 .285s versus normal reference .271s. No steady-load latency win claimed; repeated cold-herd benefit justifies additional point lookup.",
+      "summary": {
+        "scenario": "soak",
+        "accepted_jobs": 1050000,
+        "measurement_accepted_jobs": 900000,
+        "offered_jobs_per_second": 5000,
+        "window_start": 1791927134.038,
+        "window_end": 1791927314.038,
+        "window_seconds": 180.0,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": 5000.0,
+          "dispatch_jobs_per_second": 5000.0,
+          "successful_jobs_per_second": 5000.144444444444
+        },
+        "start_latency_seconds": {
+          "max": 0.408797,
+          "p50": 0.169726,
+          "p95": 0.237507,
+          "p99": 0.2849760600000001,
+          "count": 900000
+        },
+        "drain_seconds": 0.15963983535766602,
+        "profile": "durable",
+        "k6_exit_code": 0,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 4.3869105699996,
+        "aborted_for_overload": false,
+        "completed_measurement": true,
+        "execution_counter": {
+          "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+          "window_start": 1791927138.744,
+          "window_end": 1791927313.744,
+          "window_seconds": 175.0,
+          "samples": 36,
+          "successful_executions": 874930.0,
+          "successful_jobs_per_second": 4999.6
+        }
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "1024",
+        "shared_buffers": "16384",
+        "max_connections": "100",
+        "autovacuum_naptime": "60",
+        "synchronous_commit": "on",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "configuration": {
+        "name": "scheduler-bench",
+        "networks": {
+          "default": {
+            "name": "scheduler-bench_default",
+            "ipam": {}
+          }
+        },
+        "services": {
+          "api": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "api"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>",
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "HTTP_ADDR": ":8080",
+              "KAFKA_BROKERS": "kafka:9092",
+              "REDIS_ADDR": "redis:6379"
+            },
+            "image": "distributed-job-scheduler-api:bench",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 8080,
+                "published": "18080",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped"
+          },
+          "echo": {
+            "command": [
+              "-listen=:5678",
+              "-text=ok"
+            ],
+            "entrypoint": null,
+            "image": "hashicorp/http-echo:1.0.0",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped"
+          },
+          "executor": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "executor"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "deploy": {
+              "replicas": 3,
+              "resources": {},
+              "placement": {}
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "EXECUTOR_CONCURRENCY": "10",
+              "HTTP_ADDR": ":8080",
+              "HTTP_ALLOWED_HOSTS": "echo",
+              "KAFKA_BROKERS": "kafka:9092"
+            },
+            "image": "distributed-job-scheduler-executor:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "stop_grace_period": "40s"
+          },
+          "grafana": {
+            "command": null,
+            "depends_on": {
+              "prometheus": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH": "/etc/grafana/dashboards/scheduler.json",
+              "GF_SECURITY_ADMIN_PASSWORD": "<redacted>",
+              "GF_SECURITY_ADMIN_USER": "admin"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "wget",
+                "--spider",
+                "-q",
+                "http://localhost:3000/api/health"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20,
+              "start_period": "20s"
+            },
+            "image": "grafana/grafana:13.2.3",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 3000,
+                "published": "13000",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/grafana/provisioning",
+                "target": "/etc/grafana/provisioning",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/grafana/dashboards",
+                "target": "/etc/grafana/dashboards",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "volume",
+                "source": "grafana-data",
+                "target": "/var/lib/grafana",
+                "volume": {}
+              }
+            ]
+          },
+          "k6": {
+            "profiles": [
+              "tools"
+            ],
+            "command": null,
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>"
+            },
+            "image": "grafana/k6:1.6.1",
+            "networks": {
+              "default": null
+            },
+            "restart": "no",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/test/load",
+                "target": "/scripts",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/docs/bench/results/20261013T213133Z-d92038-durable-soak",
+                "target": "/results",
+                "bind": {}
+              }
+            ]
+          },
+          "kafka": {
+            "command": null,
+            "entrypoint": null,
+            "environment": {
+              "KAFKA_ADVERTISED_LISTENERS": "PLAINTEXT://kafka:9092",
+              "KAFKA_CONTROLLER_LISTENER_NAMES": "CONTROLLER",
+              "KAFKA_CONTROLLER_QUORUM_VOTERS": "1@kafka:9093",
+              "KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS": "0",
+              "KAFKA_LISTENERS": "PLAINTEXT://:9092,CONTROLLER://:9093",
+              "KAFKA_LISTENER_SECURITY_PROTOCOL_MAP": "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT",
+              "KAFKA_LOG_DIRS": "/var/lib/kafka/data",
+              "KAFKA_NODE_ID": "1",
+              "KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR": "1",
+              "KAFKA_PROCESS_ROLES": "broker,controller",
+              "KAFKA_TRANSACTION_STATE_LOG_MIN_ISR": "1",
+              "KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR": "1"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD-SHELL",
+                "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"
+              ],
+              "timeout": "5s",
+              "interval": "5s",
+              "retries": 30,
+              "start_period": "20s"
+            },
+            "image": "apache/kafka:4.2.2",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "kafka-data",
+                "target": "/var/lib/kafka/data",
+                "volume": {}
+              }
+            ]
+          },
+          "migrate": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "migrate"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "postgres": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable"
+            },
+            "image": "distributed-job-scheduler-migrate:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "postgres": {
+            "command": [
+              "postgres",
+              "-c",
+              "synchronous_commit=on",
+              "-c",
+              "shared_buffers=128MB",
+              "-c",
+              "max_wal_size=1GB",
+              "-c",
+              "fsync=on",
+              "-c",
+              "autovacuum_naptime=1min"
+            ],
+            "entrypoint": null,
+            "environment": {
+              "POSTGRES_DB": "scheduler",
+              "POSTGRES_PASSWORD": "<redacted>",
+              "POSTGRES_USER": "scheduler"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD-SHELL",
+                "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20,
+              "start_period": "10s"
+            },
+            "image": "postgres:18.6-bookworm",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "postgres-data",
+                "target": "/var/lib/postgresql",
+                "volume": {}
+              }
+            ]
+          },
+          "prometheus": {
+            "command": null,
+            "entrypoint": null,
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "wget",
+                "--spider",
+                "-q",
+                "http://localhost:9090/-/ready"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20
+            },
+            "image": "prom/prometheus:v3.15.0",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 9090,
+                "published": "19090",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/prometheus.yml",
+                "target": "/etc/prometheus/prometheus.yml",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "volume",
+                "source": "prometheus-data",
+                "target": "/prometheus",
+                "volume": {}
+              }
+            ]
+          },
+          "redis": {
+            "command": [
+              "redis-server",
+              "--appendonly",
+              "yes"
+            ],
+            "entrypoint": null,
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "redis-cli",
+                "ping"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20
+            },
+            "image": "redis:8.10.2-trixie",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "redis-data",
+                "target": "/data",
+                "volume": {}
+              }
+            ]
+          },
+          "smoke": {
+            "profiles": [
+              "tools"
+            ],
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "smoke"
+              }
+            },
+            "command": [
+              "-api-url=http://api:8080",
+              "-prometheus-url=http://prometheus:9090",
+              "-grafana-url=http://grafana:3000"
+            ],
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>",
+              "GRAFANA_ADMIN_PASSWORD": "<redacted>"
+            },
+            "image": "distributed-job-scheduler-smoke:local",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "topic-init": {
+            "command": [
+              "until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1; do sleep 1; done\n/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic jobs.run --partitions 12 --replication-factor 1\n/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic jobs.dlq --partitions 3 --replication-factor 1\n"
+            ],
+            "depends_on": {
+              "kafka": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": [
+              "/bin/sh",
+              "-ec"
+            ],
+            "image": "apache/kafka:4.2.2",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "watcher": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "watcher"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "deploy": {
+              "replicas": 2,
+              "resources": {},
+              "placement": {}
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "HTTP_ADDR": ":8080",
+              "KAFKA_BATCH_SIZE": "100",
+              "KAFKA_BATCH_TIMEOUT": "5ms",
+              "KAFKA_BROKERS": "kafka:9092",
+              "WATCHER_BATCH_SIZE": "1000"
+            },
+            "image": "distributed-job-scheduler-watcher:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped"
+          }
+        },
+        "volumes": {
+          "grafana-data": {
+            "name": "scheduler-bench_grafana-data"
+          },
+          "kafka-data": {
+            "name": "scheduler-bench_kafka-data"
+          },
+          "postgres-data": {
+            "name": "scheduler-bench_postgres-data"
+          },
+          "prometheus-data": {
+            "name": "scheduler-bench_prometheus-data"
+          },
+          "redis-data": {
+            "name": "scheduler-bench_redis-data"
+          }
+        }
+      }
+    }
+  ],
+  "combined_confirmation": [
+    {
+      "trial": null,
+      "kind": "combined confirmation",
+      "profile": "durable",
+      "delta": {
+        "runtime": "primary-key-first StartRuns CTE with candidate FOR UPDATE"
+      },
+      "directory": "20261013T213639Z-471ff2-durable-soak",
+      "decision": "retain SQL fix; sustained target not achieved",
+      "notes": "Requested300s at5k/s; guard stopped after215.289s. Full reconciliation afterdrain; p99 71.2s. Snapshots dominated by WALWrite/WalSync with checkpoint pressure, not the removed queued-index start update. Performance miss retained honestly; no further tuning trials allowed.",
+      "summary": {
+        "scenario": "soak",
+        "accepted_jobs": 1226600,
+        "measurement_accepted_jobs": 1076500,
+        "offered_jobs_per_second": 5000,
+        "window_start": 1791927440.369,
+        "window_end": 1791927655.658,
+        "window_seconds": 215.28900003433228,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": 5000.255469756141,
+          "dispatch_jobs_per_second": 4997.459228425168,
+          "successful_jobs_per_second": 4307.725893343859
+        },
+        "start_latency_seconds": {
+          "max": 75.098038,
+          "p50": 0.1826505,
+          "p95": 58.54246844999999,
+          "p99": 71.1677637,
+          "count": 1076500
+        },
+        "drain_seconds": 75.08775091171265,
+        "profile": "durable",
+        "k6_exit_code": 105,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 66.31086230800065,
+        "aborted_for_overload": true,
+        "completed_measurement": false,
+        "execution_counter": {
+          "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+          "window_start": 1791927445.045,
+          "window_end": 1791927655.045,
+          "window_seconds": 210.0,
+          "samples": 43,
+          "successful_executions": 913659.0,
+          "successful_jobs_per_second": 4350.757142857143
+        }
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "1024",
+        "shared_buffers": "16384",
+        "max_connections": "100",
+        "autovacuum_naptime": "60",
+        "synchronous_commit": "on",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "configuration": {
+        "name": "scheduler-bench",
+        "networks": {
+          "default": {
+            "name": "scheduler-bench_default",
+            "ipam": {}
+          }
+        },
+        "services": {
+          "api": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "api"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>",
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "HTTP_ADDR": ":8080",
+              "KAFKA_BROKERS": "kafka:9092",
+              "REDIS_ADDR": "redis:6379"
+            },
+            "image": "distributed-job-scheduler-api:bench",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 8080,
+                "published": "18080",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped"
+          },
+          "echo": {
+            "command": [
+              "-listen=:5678",
+              "-text=ok"
+            ],
+            "entrypoint": null,
+            "image": "hashicorp/http-echo:1.0.0",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped"
+          },
+          "executor": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "executor"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "deploy": {
+              "replicas": 3,
+              "resources": {},
+              "placement": {}
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "EXECUTOR_CONCURRENCY": "10",
+              "HTTP_ADDR": ":8080",
+              "HTTP_ALLOWED_HOSTS": "echo",
+              "KAFKA_BROKERS": "kafka:9092"
+            },
+            "image": "distributed-job-scheduler-executor:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "stop_grace_period": "40s"
+          },
+          "grafana": {
+            "command": null,
+            "depends_on": {
+              "prometheus": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH": "/etc/grafana/dashboards/scheduler.json",
+              "GF_SECURITY_ADMIN_PASSWORD": "<redacted>",
+              "GF_SECURITY_ADMIN_USER": "admin"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "wget",
+                "--spider",
+                "-q",
+                "http://localhost:3000/api/health"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20,
+              "start_period": "20s"
+            },
+            "image": "grafana/grafana:13.2.3",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 3000,
+                "published": "13000",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/grafana/provisioning",
+                "target": "/etc/grafana/provisioning",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/grafana/dashboards",
+                "target": "/etc/grafana/dashboards",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "volume",
+                "source": "grafana-data",
+                "target": "/var/lib/grafana",
+                "volume": {}
+              }
+            ]
+          },
+          "k6": {
+            "profiles": [
+              "tools"
+            ],
+            "command": null,
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>"
+            },
+            "image": "grafana/k6:1.6.1",
+            "networks": {
+              "default": null
+            },
+            "restart": "no",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/test/load",
+                "target": "/scripts",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/docs/bench/results/20261013T213639Z-471ff2-durable-soak",
+                "target": "/results",
+                "bind": {}
+              }
+            ]
+          },
+          "kafka": {
+            "command": null,
+            "entrypoint": null,
+            "environment": {
+              "KAFKA_ADVERTISED_LISTENERS": "PLAINTEXT://kafka:9092",
+              "KAFKA_CONTROLLER_LISTENER_NAMES": "CONTROLLER",
+              "KAFKA_CONTROLLER_QUORUM_VOTERS": "1@kafka:9093",
+              "KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS": "0",
+              "KAFKA_LISTENERS": "PLAINTEXT://:9092,CONTROLLER://:9093",
+              "KAFKA_LISTENER_SECURITY_PROTOCOL_MAP": "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT",
+              "KAFKA_LOG_DIRS": "/var/lib/kafka/data",
+              "KAFKA_NODE_ID": "1",
+              "KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR": "1",
+              "KAFKA_PROCESS_ROLES": "broker,controller",
+              "KAFKA_TRANSACTION_STATE_LOG_MIN_ISR": "1",
+              "KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR": "1"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD-SHELL",
+                "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"
+              ],
+              "timeout": "5s",
+              "interval": "5s",
+              "retries": 30,
+              "start_period": "20s"
+            },
+            "image": "apache/kafka:4.2.2",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "kafka-data",
+                "target": "/var/lib/kafka/data",
+                "volume": {}
+              }
+            ]
+          },
+          "migrate": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "migrate"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "postgres": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable"
+            },
+            "image": "distributed-job-scheduler-migrate:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "postgres": {
+            "command": [
+              "postgres",
+              "-c",
+              "synchronous_commit=on",
+              "-c",
+              "shared_buffers=128MB",
+              "-c",
+              "max_wal_size=1GB",
+              "-c",
+              "fsync=on",
+              "-c",
+              "autovacuum_naptime=1min"
+            ],
+            "entrypoint": null,
+            "environment": {
+              "POSTGRES_DB": "scheduler",
+              "POSTGRES_PASSWORD": "<redacted>",
+              "POSTGRES_USER": "scheduler"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD-SHELL",
+                "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20,
+              "start_period": "10s"
+            },
+            "image": "postgres:18.6-bookworm",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "postgres-data",
+                "target": "/var/lib/postgresql",
+                "volume": {}
+              }
+            ]
+          },
+          "prometheus": {
+            "command": null,
+            "entrypoint": null,
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "wget",
+                "--spider",
+                "-q",
+                "http://localhost:9090/-/ready"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20
+            },
+            "image": "prom/prometheus:v3.15.0",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 9090,
+                "published": "19090",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/prometheus.yml",
+                "target": "/etc/prometheus/prometheus.yml",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "volume",
+                "source": "prometheus-data",
+                "target": "/prometheus",
+                "volume": {}
+              }
+            ]
+          },
+          "redis": {
+            "command": [
+              "redis-server",
+              "--appendonly",
+              "yes"
+            ],
+            "entrypoint": null,
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "redis-cli",
+                "ping"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20
+            },
+            "image": "redis:8.10.2-trixie",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "redis-data",
+                "target": "/data",
+                "volume": {}
+              }
+            ]
+          },
+          "smoke": {
+            "profiles": [
+              "tools"
+            ],
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "smoke"
+              }
+            },
+            "command": [
+              "-api-url=http://api:8080",
+              "-prometheus-url=http://prometheus:9090",
+              "-grafana-url=http://grafana:3000"
+            ],
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>",
+              "GRAFANA_ADMIN_PASSWORD": "<redacted>"
+            },
+            "image": "distributed-job-scheduler-smoke:local",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "topic-init": {
+            "command": [
+              "until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1; do sleep 1; done\n/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic jobs.run --partitions 12 --replication-factor 1\n/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic jobs.dlq --partitions 3 --replication-factor 1\n"
+            ],
+            "depends_on": {
+              "kafka": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": [
+              "/bin/sh",
+              "-ec"
+            ],
+            "image": "apache/kafka:4.2.2",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "watcher": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "watcher"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "deploy": {
+              "replicas": 2,
+              "resources": {},
+              "placement": {}
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "HTTP_ADDR": ":8080",
+              "KAFKA_BATCH_SIZE": "100",
+              "KAFKA_BATCH_TIMEOUT": "5ms",
+              "KAFKA_BROKERS": "kafka:9092",
+              "WATCHER_BATCH_SIZE": "1000"
+            },
+            "image": "distributed-job-scheduler-watcher:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped"
+          }
+        },
+        "volumes": {
+          "grafana-data": {
+            "name": "scheduler-bench_grafana-data"
+          },
+          "kafka-data": {
+            "name": "scheduler-bench_kafka-data"
+          },
+          "postgres-data": {
+            "name": "scheduler-bench_postgres-data"
+          },
+          "prometheus-data": {
+            "name": "scheduler-bench_prometheus-data"
+          },
+          "redis-data": {
+            "name": "scheduler-bench_redis-data"
+          }
+        }
+      }
+    },
+    {
+      "trial": null,
+      "kind": "combined confirmation",
+      "profile": "bench",
+      "delta": {
+        "runtime": "primary-key-first StartRuns CTE with candidate FOR UPDATE"
+      },
+      "directory": "20261013T214434Z-56ab6f-bench-soak",
+      "decision": "retain",
+      "notes": "Full300s at5k/s with relaxed commit durability, bounded backlog and complete first-attempt reconciliation. No drops or rejected batches.",
+      "summary": {
+        "scenario": "soak",
+        "accepted_jobs": 1650100,
+        "measurement_accepted_jobs": 1500000,
+        "offered_jobs_per_second": 5000,
+        "window_start": 1791927914.473,
+        "window_end": 1791928214.473,
+        "window_seconds": 300.0,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": 5000.0,
+          "dispatch_jobs_per_second": 5000.333333333333,
+          "successful_jobs_per_second": 5000.363333333334
+        },
+        "start_latency_seconds": {
+          "max": 0.242438,
+          "p50": 0.108149,
+          "p95": 0.169539,
+          "p99": 0.180961,
+          "count": 1500000
+        },
+        "drain_seconds": 0.06863117218017578,
+        "profile": "bench",
+        "k6_exit_code": 0,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 7.252972463000333,
+        "aborted_for_overload": false,
+        "completed_measurement": true,
+        "execution_counter": {
+          "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+          "window_start": 1791927919.134,
+          "window_end": 1791928214.134,
+          "window_seconds": 295.0,
+          "samples": 60,
+          "successful_executions": 1475055.0,
+          "successful_jobs_per_second": 5000.186440677966
+        }
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "4096",
+        "shared_buffers": "65536",
+        "max_connections": "100",
+        "autovacuum_naptime": "60",
+        "synchronous_commit": "off",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "configuration": {
+        "name": "scheduler-bench",
+        "networks": {
+          "default": {
+            "name": "scheduler-bench_default",
+            "ipam": {}
+          }
+        },
+        "services": {
+          "api": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "api"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>",
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "HTTP_ADDR": ":8080",
+              "KAFKA_BROKERS": "kafka:9092",
+              "REDIS_ADDR": "redis:6379"
+            },
+            "image": "distributed-job-scheduler-api:bench",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 8080,
+                "published": "18080",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped"
+          },
+          "echo": {
+            "command": [
+              "-listen=:5678",
+              "-text=ok"
+            ],
+            "entrypoint": null,
+            "image": "hashicorp/http-echo:1.0.0",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped"
+          },
+          "executor": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "executor"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "deploy": {
+              "replicas": 3,
+              "resources": {},
+              "placement": {}
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "EXECUTOR_CONCURRENCY": "10",
+              "HTTP_ADDR": ":8080",
+              "HTTP_ALLOWED_HOSTS": "echo",
+              "KAFKA_BROKERS": "kafka:9092"
+            },
+            "image": "distributed-job-scheduler-executor:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "stop_grace_period": "40s"
+          },
+          "grafana": {
+            "command": null,
+            "depends_on": {
+              "prometheus": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH": "/etc/grafana/dashboards/scheduler.json",
+              "GF_SECURITY_ADMIN_PASSWORD": "<redacted>",
+              "GF_SECURITY_ADMIN_USER": "admin"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "wget",
+                "--spider",
+                "-q",
+                "http://localhost:3000/api/health"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20,
+              "start_period": "20s"
+            },
+            "image": "grafana/grafana:13.2.3",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 3000,
+                "published": "13000",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/grafana/provisioning",
+                "target": "/etc/grafana/provisioning",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/grafana/dashboards",
+                "target": "/etc/grafana/dashboards",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "volume",
+                "source": "grafana-data",
+                "target": "/var/lib/grafana",
+                "volume": {}
+              }
+            ]
+          },
+          "k6": {
+            "profiles": [
+              "tools"
+            ],
+            "command": null,
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>"
+            },
+            "image": "grafana/k6:1.6.1",
+            "networks": {
+              "default": null
+            },
+            "restart": "no",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/test/load",
+                "target": "/scripts",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/docs/bench/results/20261013T214434Z-56ab6f-bench-soak",
+                "target": "/results",
+                "bind": {}
+              }
+            ]
+          },
+          "kafka": {
+            "command": null,
+            "entrypoint": null,
+            "environment": {
+              "KAFKA_ADVERTISED_LISTENERS": "PLAINTEXT://kafka:9092",
+              "KAFKA_CONTROLLER_LISTENER_NAMES": "CONTROLLER",
+              "KAFKA_CONTROLLER_QUORUM_VOTERS": "1@kafka:9093",
+              "KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS": "0",
+              "KAFKA_LISTENERS": "PLAINTEXT://:9092,CONTROLLER://:9093",
+              "KAFKA_LISTENER_SECURITY_PROTOCOL_MAP": "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT",
+              "KAFKA_LOG_DIRS": "/var/lib/kafka/data",
+              "KAFKA_NODE_ID": "1",
+              "KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR": "1",
+              "KAFKA_PROCESS_ROLES": "broker,controller",
+              "KAFKA_TRANSACTION_STATE_LOG_MIN_ISR": "1",
+              "KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR": "1"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD-SHELL",
+                "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"
+              ],
+              "timeout": "5s",
+              "interval": "5s",
+              "retries": 30,
+              "start_period": "20s"
+            },
+            "image": "apache/kafka:4.2.2",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "kafka-data",
+                "target": "/var/lib/kafka/data",
+                "volume": {}
+              }
+            ]
+          },
+          "migrate": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "migrate"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "postgres": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable"
+            },
+            "image": "distributed-job-scheduler-migrate:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "postgres": {
+            "command": [
+              "postgres",
+              "-c",
+              "synchronous_commit=off",
+              "-c",
+              "shared_buffers=512MB",
+              "-c",
+              "max_wal_size=4GB",
+              "-c",
+              "fsync=on",
+              "-c",
+              "autovacuum_naptime=1min"
+            ],
+            "entrypoint": null,
+            "environment": {
+              "POSTGRES_DB": "scheduler",
+              "POSTGRES_PASSWORD": "<redacted>",
+              "POSTGRES_USER": "scheduler"
+            },
+            "healthcheck": {
+              "test": [
+                "CMD-SHELL",
+                "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20,
+              "start_period": "10s"
+            },
+            "image": "postgres:18.6-bookworm",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "postgres-data",
+                "target": "/var/lib/postgresql",
+                "volume": {}
+              }
+            ]
+          },
+          "prometheus": {
+            "command": null,
+            "entrypoint": null,
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "wget",
+                "--spider",
+                "-q",
+                "http://localhost:9090/-/ready"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20
+            },
+            "image": "prom/prometheus:v3.15.0",
+            "networks": {
+              "default": null
+            },
+            "ports": [
+              {
+                "mode": "ingress",
+                "host_ip": "127.0.0.1",
+                "target": 9090,
+                "published": "19090",
+                "protocol": "tcp"
+              }
+            ],
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "bind",
+                "source": "/home/felix/Documents/Projects/distributed_job_scheduler/observability/prometheus.yml",
+                "target": "/etc/prometheus/prometheus.yml",
+                "read_only": true,
+                "bind": {}
+              },
+              {
+                "type": "volume",
+                "source": "prometheus-data",
+                "target": "/prometheus",
+                "volume": {}
+              }
+            ]
+          },
+          "redis": {
+            "command": [
+              "redis-server",
+              "--appendonly",
+              "yes"
+            ],
+            "entrypoint": null,
+            "healthcheck": {
+              "test": [
+                "CMD",
+                "redis-cli",
+                "ping"
+              ],
+              "timeout": "3s",
+              "interval": "5s",
+              "retries": 20
+            },
+            "image": "redis:8.10.2-trixie",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped",
+            "volumes": [
+              {
+                "type": "volume",
+                "source": "redis-data",
+                "target": "/data",
+                "volume": {}
+              }
+            ]
+          },
+          "smoke": {
+            "profiles": [
+              "tools"
+            ],
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "smoke"
+              }
+            },
+            "command": [
+              "-api-url=http://api:8080",
+              "-prometheus-url=http://prometheus:9090",
+              "-grafana-url=http://grafana:3000"
+            ],
+            "entrypoint": null,
+            "environment": {
+              "API_KEY": "<redacted>",
+              "GRAFANA_ADMIN_PASSWORD": "<redacted>"
+            },
+            "image": "distributed-job-scheduler-smoke:local",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "topic-init": {
+            "command": [
+              "until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1; do sleep 1; done\n/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic jobs.run --partitions 12 --replication-factor 1\n/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic jobs.dlq --partitions 3 --replication-factor 1\n"
+            ],
+            "depends_on": {
+              "kafka": {
+                "condition": "service_healthy",
+                "required": true
+              }
+            },
+            "entrypoint": [
+              "/bin/sh",
+              "-ec"
+            ],
+            "image": "apache/kafka:4.2.2",
+            "networks": {
+              "default": null
+            },
+            "restart": "no"
+          },
+          "watcher": {
+            "build": {
+              "context": "/home/felix/Documents/Projects/distributed_job_scheduler",
+              "dockerfile": "Dockerfile",
+              "args": {
+                "SERVICE": "watcher"
+              }
+            },
+            "command": null,
+            "depends_on": {
+              "migrate": {
+                "condition": "service_completed_successfully",
+                "required": true
+              },
+              "topic-init": {
+                "condition": "service_completed_successfully",
+                "required": true
+              }
+            },
+            "deploy": {
+              "replicas": 2,
+              "resources": {},
+              "placement": {}
+            },
+            "entrypoint": null,
+            "environment": {
+              "DATABASE_URL": "postgres://<redacted>@postgres:5432/scheduler?sslmode=disable&pool_max_conns=12",
+              "HTTP_ADDR": ":8080",
+              "KAFKA_BATCH_SIZE": "100",
+              "KAFKA_BATCH_TIMEOUT": "5ms",
+              "KAFKA_BROKERS": "kafka:9092",
+              "WATCHER_BATCH_SIZE": "1000"
+            },
+            "image": "distributed-job-scheduler-watcher:bench",
+            "networks": {
+              "default": null
+            },
+            "restart": "unless-stopped"
+          }
+        },
+        "volumes": {
+          "grafana-data": {
+            "name": "scheduler-bench_grafana-data"
+          },
+          "kafka-data": {
+            "name": "scheduler-bench_kafka-data"
+          },
+          "postgres-data": {
+            "name": "scheduler-bench_postgres-data"
+          },
+          "prometheus-data": {
+            "name": "scheduler-bench_prometheus-data"
+          },
+          "redis-data": {
+            "name": "scheduler-bench_redis-data"
+          }
+        }
+      }
+    }
+  ],
+  "selected_configuration": {
+    "watchers": 2,
+    "executors": 3,
+    "executor_concurrency": 10,
+    "pool_max_conns": 12,
+    "partitions": 12,
+    "watcher_batch_size": 1000,
+    "kafka_batch_size": 100,
+    "kafka_batch_timeout": "5ms",
+    "autovacuum_naptime": "1min",
+    "fillfactor": 70,
+    "fsync": "on",
+    "durable": {
+      "synchronous_commit": "on",
+      "shared_buffers": "128MB",
+      "max_wal_size": "1GB"
+    },
+    "bench": {
+      "synchronous_commit": "off",
+      "shared_buffers": "512MB",
+      "max_wal_size": "4GB"
+    }
+  },
+  "retained_runtime_change": "StartRuns uses a materialized candidate SELECT by primary key with FOR UPDATE; the target UPDATE checks the locked candidate state and attempt.",
+  "validation": {
+    "unit_race": "passed on final runtime",
+    "full_integration_race": "passed initial CTE version before final candidate FOR UPDATE refinement;400.608s",
+    "targeted_integration_race": "passed final runtime;43.969s",
+    "lint": "passed",
+    "python_measurements": "4 passed",
+    "bash_lifecycle_and_settings": "passed",
+    "artifacts": "accepted raw metric sums, gzip integrity, redaction, byte-preserved archive and document links checked"
+  },
+  "development_services_restored": [
+    "api",
+    "executor",
+    "kafka",
+    "postgres",
+    "redis",
+    "watcher"
+  ]
+}

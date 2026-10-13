@@ -286,7 +286,10 @@ func TestStuckQueuedSweepPreservesAttemptAndStartGate(t *testing.T) {
 		t.Fatalf("old delivery started before redispatch: %+v, %v", claimed, err)
 	}
 	queueRetry(t, message.RunID)
-	claimed, err := data.StartRuns(context.Background(), []store.DispatchMessage{message, message, cancelled}, worker)
+	stale := message
+	stale.Attempt++
+	missing := store.DispatchMessage{RunID: uuid.NewString(), Attempt: 1}
+	claimed, err := data.StartRuns(context.Background(), []store.DispatchMessage{stale, missing, message, message, cancelled}, worker)
 	if err != nil || len(claimed) != 1 {
 		t.Fatalf("redispatched duplicate/cancelled starts = %+v, %v", claimed, err)
 	}
@@ -298,6 +301,39 @@ func TestStuckQueuedSweepPreservesAttemptAndStartGate(t *testing.T) {
 		t.Fatalf("attempt history count = %d, %v", attempts, err)
 	}
 	waitForRun(t, cancelled.RunID, "CANCELLED")
+}
+
+func TestStartBatchAttemptInsertFailureRollsBack(t *testing.T) {
+	first, second := queuedDispatch(t, store.Job{}), queuedDispatch(t, store.Job{})
+	worker := registeredWorker(t, time.Minute)
+	// A conflicting history row forces the second insert to fail after the
+	// batch has updated both runs and inserted the first history row.
+	if _, err := database.Exec(`INSERT INTO run_attempts (run_id, attempt, worker_id, started_at)
+		VALUES ($1,1,$2,now())`, second.RunID, worker); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if _, err := database.Exec(`DELETE FROM run_attempts WHERE run_id::text=$1`, second.RunID); err != nil {
+			t.Error(err)
+		}
+	})
+	starts := metric(t, "start_latency_seconds", "").GetHistogram().GetSampleCount()
+	if claimed, err := data.StartRuns(context.Background(), []store.DispatchMessage{first, second}, worker); err == nil || len(claimed) != 0 {
+		t.Fatalf("conflicting start batch = %+v, %v; want rollback", claimed, err)
+	}
+	for _, message := range []store.DispatchMessage{first, second} {
+		run := waitForRun(t, message.RunID, "QUEUED")
+		if run.StartedAt != nil || run.WorkerID != "" {
+			t.Fatalf("start survived rollback: %+v", run)
+		}
+	}
+	var attempts int
+	if err := database.QueryRow(`SELECT count(*) FROM run_attempts WHERE run_id::text=$1`, first.RunID).Scan(&attempts); err != nil || attempts != 0 {
+		t.Fatalf("attempt survived rollback: count %d, error %v", attempts, err)
+	}
+	if got := metric(t, "start_latency_seconds", "").GetHistogram().GetSampleCount(); got != starts {
+		t.Fatalf("start metrics advanced after rollback: %d, want %d", got, starts)
+	}
 }
 
 func fastWorkerOptions(concurrency int) executorlib.Options {

@@ -47,7 +47,8 @@ SELECT jsonb_build_object(
     'max', max(extract(epoch FROM started_at - scheduled_for))
   ) FROM scoped_runs WHERE started_at IS NOT NULL AND left(name, length(:'prefix') + 8) = :'prefix' || 'measure/'),
   'postgres', (SELECT jsonb_object_agg(name, setting) FROM pg_settings WHERE
-    name IN ('synchronous_commit', 'fsync', 'shared_buffers', 'max_wal_size', 'max_connections')),
+    name IN ('synchronous_commit', 'fsync', 'shared_buffers', 'max_wal_size', 'max_connections',
+      'autovacuum_naptime', 'autovacuum_vacuum_scale_factor', 'autovacuum_analyze_scale_factor')),
   'tables', (SELECT jsonb_agg(jsonb_build_object('table', relname, 'inserts', n_tup_ins,
     'updates', n_tup_upd, 'hot_updates', n_tup_hot_upd, 'dead_tuples', n_dead_tup,
     'autovacuum_count', autovacuum_count)) FROM pg_stat_user_tables)

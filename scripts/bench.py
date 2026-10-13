@@ -272,6 +272,9 @@ def run(profile, scenario, values):
                                                 backlog=sum(window) / len(window), samples=len(window),
                                                 minimum=min(window), maximum=max(window)))
                             save(directory / "backlog.json", samples)
+                            with (directory / "diagnostics.log").open("a") as diagnostics:
+                                diagnostics.write(sql("bench_diagnostics.sql",
+                                                      batch=int(os.environ.get("WATCHER_BATCH_SIZE", 1000))) + "\n")
                             if growing_backlog(samples):
                                 overloaded = True
                                 print("Backlog grew across three 30-second windows; stopping offered load.", flush=True)
@@ -286,11 +289,17 @@ def run(profile, scenario, values):
         data["benchmark"]["aborted_for_overload"] = overloaded
         drain_start = time.monotonic()
         pending = 0
+        next_diagnostic = 0
         if scenario != "ingest":
             while True:
                 pending = int(sql("bench_pending.sql"))
                 if not pending or time.monotonic() - drain_start >= values["BENCH_DRAIN_TIMEOUT"]:
                     break
+                if scenario == "herd" and time.monotonic() >= next_diagnostic:
+                    with (directory / "diagnostics.log").open("a") as diagnostics:
+                        diagnostics.write(sql("bench_diagnostics.sql",
+                                              batch=int(os.environ.get("WATCHER_BATCH_SIZE", 1000))) + "\n")
+                    next_diagnostic = time.monotonic() + 10
                 print("Waiting for " + str(pending) + " unfinished runs", flush=True)
                 time.sleep(5)
         drain_wait = time.monotonic() - drain_start

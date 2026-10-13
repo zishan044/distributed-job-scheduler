@@ -592,10 +592,17 @@ func (s *Store) StartRuns(ctx context.Context, messages []DispatchMessage, worke
 	}
 	batch := &pgx.Batch{}
 	for i, message := range messages {
-		batch.Queue(`UPDATE job_runs SET status='RUNNING', worker_id=$3, started_at=clock_timestamp()
-			WHERE id=$1 AND attempt=$2 AND status='QUEUED'
+		// Lock the candidate by primary key before checking its state, including
+		// a row inserted after the initial ordered lock query's snapshot.
+		// MATERIALIZED prevents stale status statistics from choosing a scan
+		// of the entire QUEUED partial index for this point update.
+		batch.Queue(`WITH candidate AS MATERIALIZED (
+			SELECT id, attempt, status FROM job_runs WHERE id=$1 FOR UPDATE
+		)
+			UPDATE job_runs r SET status='RUNNING', worker_id=$3, started_at=clock_timestamp()
+			FROM candidate c WHERE r.id=c.id AND c.attempt=$2 AND c.status='QUEUED'
 			AND EXISTS (SELECT 1 FROM workers WHERE id=$3 AND lease_expires_at > clock_timestamp())
-			RETURNING started_at, EXTRACT(EPOCH FROM (started_at-scheduled_for))::double precision`, ids[i], message.Attempt, worker)
+			RETURNING r.started_at, EXTRACT(EPOCH FROM (r.started_at-r.scheduled_for))::double precision`, ids[i], message.Attempt, worker)
 	}
 	results := tx.SendBatch(ctx, batch)
 	type startedRun struct {

@@ -65,6 +65,19 @@ run durable setup
 [[ $result == 2 ]]
 ! contains 'compose -p scheduler-bench -f docker-compose.yml -f docker-compose.bench.yml down --volumes --remove-orphans'
 unset BENCH_TEST_DEV_NAME
+export BENCH_AUTOVACUUM_NAPTIME=0s
+run durable setup
+[[ $result == 2 && ! -s "$BENCH_TEST_LOG" ]]
+unset BENCH_AUTOVACUUM_NAPTIME
+export BENCH_MAX_WAL_SIZE=0MB
+run durable setup
+[[ $result == 2 && ! -s "$BENCH_TEST_LOG" ]]
+unset BENCH_MAX_WAL_SIZE
+export BENCH_MAX_WAL_SIZE=4GB
+run durable setup
+[[ $result == 0 ]]
+grep -Fq 'synchronous_commit=on, fsync=on, max_wal_size=4GB' "$tmp/output"
+unset BENCH_MAX_WAL_SIZE
 for args in 'unknown setup' 'durable unknown'; do
   read -r -a values <<< "$args"
   run "${values[@]}"

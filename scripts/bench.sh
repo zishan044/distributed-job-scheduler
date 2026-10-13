@@ -7,10 +7,10 @@ profile=${1:-durable}
 scenario=${2:-setup}
 case "$profile" in
   durable)
-    export BENCH_SYNCHRONOUS_COMMIT=on BENCH_SHARED_BUFFERS=128MB BENCH_MAX_WAL_SIZE=1GB
+    export BENCH_SYNCHRONOUS_COMMIT=on BENCH_SHARED_BUFFERS=128MB BENCH_MAX_WAL_SIZE=${BENCH_MAX_WAL_SIZE:-1GB}
     ;;
   bench)
-    export BENCH_SYNCHRONOUS_COMMIT=off BENCH_SHARED_BUFFERS=512MB BENCH_MAX_WAL_SIZE=4GB
+    export BENCH_SYNCHRONOUS_COMMIT=off BENCH_SHARED_BUFFERS=512MB BENCH_MAX_WAL_SIZE=${BENCH_MAX_WAL_SIZE:-4GB}
     ;;
   *) echo "Profile must be durable or bench." >&2; exit 2 ;;
 esac
@@ -26,6 +26,14 @@ for name in BENCH_WATCHERS BENCH_EXECUTORS BENCH_PARTITIONS BENCH_DB_POOL_MAX_CO
     exit 2
   fi
 done
+if [[ ! ${BENCH_AUTOVACUUM_NAPTIME:-1min} =~ ^[1-9][0-9]*(s|min|h)$ ]]; then
+  echo "BENCH_AUTOVACUUM_NAPTIME must be a positive PostgreSQL duration." >&2
+  exit 2
+fi
+if [[ ! $BENCH_MAX_WAL_SIZE =~ ^[1-9][0-9]*(MB|GB)$ ]]; then
+  echo "BENCH_MAX_WAL_SIZE must be positive MB or GB." >&2
+  exit 2
+fi
 
 dev=(docker compose -f docker-compose.yml)
 bench=(docker compose -p scheduler-bench -f docker-compose.yml -f docker-compose.bench.yml)
@@ -62,7 +70,7 @@ fi
 # Only this fixed project's volumes are disposable. Keep them after the run
 # for inspection; the next independent run starts clean.
 "${bench[@]}" down --volumes --remove-orphans
-echo "Benchmark profile: $profile (synchronous_commit=$BENCH_SYNCHRONOUS_COMMIT, fsync=on)"
+echo "Benchmark profile: $profile (synchronous_commit=$BENCH_SYNCHRONOUS_COMMIT, fsync=on, max_wal_size=$BENCH_MAX_WAL_SIZE)"
 "${bench[@]}" up -d --wait --wait-timeout 180
 if [[ "$scenario" == setup ]]; then
   "${bench[@]}" run --rm --no-deps -T k6 run /scripts/setup.js
