@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/zishan044/distributed-job-scheduler/internal/metrics"
@@ -377,6 +378,19 @@ func (s *Store) ListJobRuns(ctx context.Context, jobID string, limit, offset int
 	return runs, nil
 }
 
+// immediateRun retries only a rolled-back fire-time collision. Database time
+// has microsecond precision, so concurrent manual inserts can share a timestamp.
+// Each new statement gets fresh now(); successful inserts are never repeated.
+func (s *Store) immediateRun(ctx context.Context, query string, args ...any) (Run, error) {
+	for {
+		run, err := scanRun(s.pool.QueryRow(ctx, query, args...))
+		var conflict *pgconn.PgError
+		if !errors.As(err, &conflict) || conflict.Code != "23505" || conflict.ConstraintName != "job_runs_job_id_fire_time_key" {
+			return run, err
+		}
+	}
+}
+
 func (s *Store) RunNow(ctx context.Context, jobID string) (Run, error) {
 	dbJobID, err := parseUUID(jobID)
 	if err != nil {
@@ -386,7 +400,7 @@ func (s *Store) RunNow(ctx context.Context, jobID string) (Run, error) {
 	if err != nil {
 		return Run{}, fmt.Errorf("generate run id: %w", err)
 	}
-	run, err := scanRun(s.pool.QueryRow(ctx, `
+	run, err := s.immediateRun(ctx, `
 		WITH immediate_job AS (
 			SELECT id FROM jobs WHERE id=$2 AND deleted_at IS NULL FOR UPDATE
 		)
@@ -395,7 +409,7 @@ func (s *Store) RunNow(ctx context.Context, jobID string) (Run, error) {
 		FROM immediate_job
 		RETURNING `+runColumns,
 		databaseUUID(runID), dbJobID,
-	))
+	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		if _, getErr := s.GetJob(ctx, jobID); getErr != nil {
 			return Run{}, getErr
@@ -416,7 +430,7 @@ func (s *Store) RetryRun(ctx context.Context, id string) (Run, error) {
 	if err != nil {
 		return Run{}, fmt.Errorf("generate retry run id: %w", err)
 	}
-	run, err := scanRun(s.pool.QueryRow(ctx, `
+	run, err := s.immediateRun(ctx, `
 		WITH retry_source AS (
 			SELECT r.job_id FROM job_runs r JOIN jobs j ON j.id=r.job_id
 			WHERE r.id=$2 AND r.status='DEAD' AND j.deleted_at IS NULL
@@ -424,7 +438,7 @@ func (s *Store) RetryRun(ctx context.Context, id string) (Run, error) {
 		)
 		INSERT INTO job_runs (id, job_id, fire_time, scheduled_for, status, retry_of)
 		SELECT $1, job_id, now(), now(), 'PENDING', $2 FROM retry_source
-		RETURNING `+runColumns, databaseUUID(runID), sourceID))
+		RETURNING `+runColumns, databaseUUID(runID), sourceID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		if _, getErr := s.GetRun(ctx, id); getErr != nil {
 			return Run{}, getErr

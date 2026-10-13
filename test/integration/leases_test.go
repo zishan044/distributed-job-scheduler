@@ -603,13 +603,17 @@ func TestWatcherSweepsWhileKafkaPublishIsBlocked(t *testing.T) {
 	writer := &kafka.Writer{Addr: kafka.TCP(listener.Addr().String()), Topic: "jobs.run", RequiredAcks: kafka.RequireAll}
 	dlq := kafkaWriter(createKafkaTopic(t))
 	t.Cleanup(func() { _ = writer.Close(); _ = dlq.Close() })
-	startWatcher(t, writer, dlq, fastWatcherOptions())
+	options := fastWatcherOptions()
+	options.RetentionInterval = 20 * time.Millisecond
+	startWatcher(t, writer, dlq, options)
 	select {
 	case conn := <-accepted:
 		t.Cleanup(func() { _ = conn.Close() })
 	case <-time.After(5 * time.Second):
 		t.Fatal("dispatcher did not reach the blocked Kafka broker")
 	}
+	old := databaseNow(t).Add(-8 * 24 * time.Hour)
+	expired := retentionRun(t, zombie.JobID, "SUCCEEDED", &old)
 	expireWorker(t, crashed)
 	ctx, stop := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer stop()
@@ -639,6 +643,20 @@ func TestWatcherSweepsWhileKafkaPublishIsBlocked(t *testing.T) {
 			return fmt.Errorf("cron materialization was blocked by Kafka")
 		}
 		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	retentionCtx, stopRetention := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer stopRetention()
+	if err := waitFor(retentionCtx, func() error {
+		_, err := data.GetRun(retentionCtx, expired)
+		if errors.Is(err, store.ErrNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("retention was blocked by Kafka")
 	}); err != nil {
 		t.Fatal(err)
 	}

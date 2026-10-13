@@ -171,34 +171,50 @@ func TestRetryRejectsInvalidSources(t *testing.T) {
 	assertCounter(t, "retries_total", "", before)
 }
 
-func TestConcurrentExplicitRetriesCreateSeparateChains(t *testing.T) {
-	source := deadRun(t)
-	const callers = 8
-	before := counterValue(t, "retries_total", "")
-	type result struct {
-		run store.Run
-		err error
+func TestConcurrentImmediateRunsCreateSeparateChains(t *testing.T) {
+	for _, operation := range []string{"retry", "run-now"} {
+		t.Run(operation, func(t *testing.T) {
+			source := deadRun(t)
+			const callers = 8
+			before := counterValue(t, "retries_total", "")
+			type result struct {
+				run store.Run
+				err error
+			}
+			start, done := make(chan struct{}), make(chan result, callers)
+			for range callers {
+				go func() {
+					<-start
+					ctx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+					defer stop()
+					var run store.Run
+					var err error
+					if operation == "retry" {
+						run, err = data.RetryRun(ctx, source.ID)
+					} else {
+						run, err = data.RunNow(ctx, source.JobID)
+					}
+					done <- result{run, err}
+				}()
+			}
+			close(start)
+			seen := make(map[string]bool)
+			wantLink, wantRetries := "", before
+			if operation == "retry" {
+				wantLink, wantRetries = source.ID, before+callers
+			}
+			for range callers {
+				result := <-done
+				if result.err != nil || result.run.Status != "PENDING" || result.run.RetryOf != wantLink || seen[result.run.ID] {
+					// Drain all callers before fixture cleanup, even when one fails.
+					t.Errorf("concurrent %s = %+v, error: %v", operation, result.run, result.err)
+					continue
+				}
+				seen[result.run.ID] = true
+			}
+			assertCounter(t, "retries_total", "", wantRetries)
+		})
 	}
-	start, done := make(chan struct{}), make(chan result, callers)
-	for range callers {
-		go func() {
-			<-start
-			ctx, stop := context.WithTimeout(context.Background(), 5*time.Second)
-			defer stop()
-			run, err := data.RetryRun(ctx, source.ID)
-			done <- result{run, err}
-		}()
-	}
-	close(start)
-	seen := make(map[string]bool)
-	for range callers {
-		result := <-done
-		if result.err != nil || result.run.Status != "PENDING" || result.run.RetryOf != source.ID || seen[result.run.ID] {
-			t.Fatalf("concurrent retry = %+v", result)
-		}
-		seen[result.run.ID] = true
-	}
-	assertCounter(t, "retries_total", "", before+callers)
 }
 
 func TestRetryRechecksDeletionAfterJobLockWait(t *testing.T) {

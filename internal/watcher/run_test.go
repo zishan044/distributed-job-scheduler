@@ -10,6 +10,7 @@ func TestWatcherOptions(t *testing.T) {
 	for _, change := range []func(*Options){
 		func(o *Options) { o.DispatchInterval = 0 },
 		func(o *Options) { o.SweepInterval = 0 },
+		func(o *Options) { o.RetentionInterval = 0 },
 		func(o *Options) { o.QueuedTimeout = 0 },
 		func(o *Options) { o.OperationTimeout = 0 },
 		func(o *Options) { o.BatchSize = 0 },
