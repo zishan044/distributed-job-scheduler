@@ -6,7 +6,7 @@
 //
 // Creates generate an idempotency key per call and reuse it on automatic
 // retries. Supply WithIdempotencyKey to replay a create across separate calls.
-// Reads, cancellation, pause/resume, and keyed creates retry network errors and HTTP 5xx;
+// Reads, cancellation, pause/resume, deletion, and keyed creates retry network errors and HTTP 5xx;
 // RunNow and Retry never retry automatically because each call creates a fresh run.
 package client
 
@@ -227,6 +227,15 @@ func (c *Client) ScheduleBatch(ctx context.Context, requests []api.CreateJobRequ
 func (c *Client) GetJob(ctx context.Context, jobID string) (api.Job, error) {
 	var job api.Job
 	err := c.request(ctx, http.MethodGet, "/v1/jobs/"+url.PathEscape(jobID), nil, &job, "", true)
+	return job, err
+}
+
+// Delete soft-deletes a job, cancels waiting runs, and requests cooperative
+// cancellation of running work. History remains readable; repeating Delete is
+// harmless and uses the configured transient retry policy.
+func (c *Client) Delete(ctx context.Context, jobID string) (api.Job, error) {
+	var job api.Job
+	err := c.request(ctx, http.MethodDelete, "/v1/jobs/"+url.PathEscape(jobID), nil, &job, "", true)
 	return job, err
 }
 

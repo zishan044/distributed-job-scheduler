@@ -30,6 +30,7 @@ func NewAPIRouter(logger *slog.Logger, data *store.Store, cache *redis.Client, a
 	v1.POST("/jobs", handler.createJob)
 	v1.POST("/jobs/batch", handler.createBatch)
 	v1.GET("/jobs/:id", handler.getJob)
+	v1.DELETE("/jobs/:id", handler.deleteJob)
 	v1.GET("/jobs/:id/runs", handler.listJobRuns)
 	v1.POST("/jobs/:id/run-now", handler.runNow)
 	v1.POST("/jobs/:id/pause", func(c *gin.Context) { handler.setJobPaused(c, true) })
@@ -131,6 +132,19 @@ func (h *apiHandler) getJob(c *gin.Context) {
 		h.writeStoreError(c, err)
 		return
 	}
+	c.JSON(http.StatusOK, job)
+}
+
+func (h *apiHandler) deleteJob(c *gin.Context) {
+	if !validPathID(c) {
+		return
+	}
+	job, err := h.store.DeleteJob(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		h.writeStoreError(c, err)
+		return
+	}
+	h.logger.Info("job deleted", "job_id", job.ID)
 	c.JSON(http.StatusOK, job)
 }
 

@@ -87,6 +87,13 @@ func TestRoutesAuthenticationAndPayloads(t *testing.T) {
 			job, err := c.GetJob(ctx, "job")
 			return job.ID, err
 		}},
+		{"delete job", "DELETE", "/v1/jobs/job", false, nil, api.Job{ID: "job", DeletedAt: request.ScheduledFor}, func(c *client.Client) (string, error) {
+			job, err := c.Delete(ctx, "job")
+			if err == nil && job.DeletedAt == nil {
+				return "", fmt.Errorf("delete response lost deletion time")
+			}
+			return job.ID, err
+		}},
 		{"pause job", "POST", "/v1/jobs/job/pause", false, nil, api.Job{ID: "job", Paused: true}, func(c *client.Client) (string, error) {
 			job, err := c.Pause(ctx, "job")
 			if err == nil && !job.Paused {
@@ -224,6 +231,36 @@ func TestPauseResumeRetriesEscapedIDsAndConflicts(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestDeleteRetriesEscapedIDAndMissingJob(t *testing.T) {
+	for _, status := range []int{http.StatusServiceUnavailable, http.StatusNotFound} {
+		t.Run(fmt.Sprint(status), func(t *testing.T) {
+			var calls atomic.Int32
+			deletedAt := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodDelete || r.RequestURI != "/proxy/v1/jobs/job%2Fid" || r.Header.Get("Idempotency-Key") != "" {
+					t.Errorf("unexpected delete request: %s %s, headers %v", r.Method, r.RequestURI, r.Header)
+				}
+				if calls.Add(1) == 1 {
+					w.WriteHeader(status)
+					writeJSON(t, w, api.ErrorResponse{Error: "delete failed"})
+					return
+				}
+				writeJSON(t, w, api.Job{ID: "job", DeletedAt: &deletedAt})
+			}))
+			defer server.Close()
+			job, err := newClient(t, server.URL+"/proxy", client.WithRetry(2)).Delete(context.Background(), "job/id")
+			if status == http.StatusNotFound {
+				var failure *client.HTTPError
+				if !errors.As(err, &failure) || failure.StatusCode != status || calls.Load() != 1 {
+					t.Fatalf("missing job = %v, calls=%d", err, calls.Load())
+				}
+			} else if err != nil || job.DeletedAt == nil || !job.DeletedAt.Equal(deletedAt) || calls.Load() != 2 {
+				t.Fatalf("delete retry = %+v, %v, calls=%d", job, err, calls.Load())
+			}
+		})
 	}
 }
 

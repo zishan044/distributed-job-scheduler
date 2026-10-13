@@ -67,6 +67,11 @@ const runColumns = `id::text, job_id::text, fire_time, scheduled_for, status, at
 	COALESCE(worker_id::text, ''), queued_at, started_at, finished_at,
 	COALESCE(last_error, ''), cancel_requested, COALESCE(retry_of::text, '')`
 
+const cancelRunAssignments = `
+	status = CASE WHEN status IN ('PENDING', 'QUEUED') THEN 'CANCELLED' ELSE status END,
+	finished_at = CASE WHEN status IN ('PENDING', 'QUEUED') THEN now() ELSE finished_at END,
+	cancel_requested = CASE WHEN status = 'RUNNING' THEN true ELSE cancel_requested END`
+
 type rowScanner interface {
 	Scan(...any) error
 }
@@ -291,6 +296,42 @@ func (s *Store) SetJobPaused(ctx context.Context, id string, paused bool) (Job, 
 	return job, err
 }
 
+// DeleteJob atomically marks a job deleted and cancels its active runs. Running
+// attempts receive cooperative cancellation; history and the deletion time are
+// preserved on repeated calls. Run creators take the same job lock before inserting.
+func (s *Store) DeleteJob(ctx context.Context, id string) (Job, error) {
+	dbID, err := parseUUID(id)
+	if err != nil {
+		return Job{}, err
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return Job{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	job, err := scanJob(tx.QueryRow(ctx, `UPDATE jobs SET deleted_at=COALESCE(deleted_at, now())
+		WHERE id=$1 RETURNING `+jobColumns, dbID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Job{}, ErrNotFound
+	}
+	if err != nil {
+		return Job{}, err
+	}
+	// Match the executor's lock order when cancelling a batch of runs.
+	if _, err := tx.Exec(ctx, `SELECT id FROM job_runs WHERE job_id=$1
+		AND status IN ('PENDING','QUEUED','RUNNING') ORDER BY id FOR UPDATE`, dbID); err != nil {
+		return Job{}, err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE job_runs SET `+cancelRunAssignments+`
+		WHERE job_id=$1 AND status IN ('PENDING','QUEUED','RUNNING')`, dbID); err != nil {
+		return Job{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return Job{}, err
+	}
+	return job, nil
+}
+
 func (s *Store) GetRun(ctx context.Context, id string) (Run, error) {
 	dbID, err := parseUUID(id)
 	if err != nil {
@@ -346,10 +387,12 @@ func (s *Store) RunNow(ctx context.Context, jobID string) (Run, error) {
 		return Run{}, fmt.Errorf("generate run id: %w", err)
 	}
 	run, err := scanRun(s.pool.QueryRow(ctx, `
+		WITH immediate_job AS (
+			SELECT id FROM jobs WHERE id=$2 AND deleted_at IS NULL FOR UPDATE
+		)
 		INSERT INTO job_runs (id, job_id, fire_time, scheduled_for, status)
 		SELECT $1, id, now(), now(), 'PENDING'
-		FROM jobs
-		WHERE id = $2 AND deleted_at IS NULL
+		FROM immediate_job
 		RETURNING `+runColumns,
 		databaseUUID(runID), dbJobID,
 	))
@@ -400,10 +443,7 @@ func (s *Store) CancelRun(ctx context.Context, id string) (Run, error) {
 		return Run{}, err
 	}
 	run, err := scanRun(s.pool.QueryRow(ctx, `
-		UPDATE job_runs
-		SET status = CASE WHEN status IN ('PENDING', 'QUEUED') THEN 'CANCELLED' ELSE status END,
-		    finished_at = CASE WHEN status IN ('PENDING', 'QUEUED') THEN now() ELSE finished_at END,
-		    cancel_requested = CASE WHEN status = 'RUNNING' THEN true ELSE cancel_requested END
+		UPDATE job_runs SET `+cancelRunAssignments+`
 		WHERE id = $1 AND status IN ('PENDING', 'QUEUED', 'RUNNING')
 		RETURNING `+runColumns,
 		dbID,
