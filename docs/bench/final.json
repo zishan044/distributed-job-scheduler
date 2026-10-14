@@ -1,0 +1,3689 @@
+{
+  "date": "2026-10-14",
+  "timezone": "Asia/Dhaka",
+  "milestone": "M7",
+  "subset": 4,
+  "complete": true,
+  "configuration": {
+    "watchers": 2,
+    "executors": 3,
+    "partitions": 12,
+    "executor_concurrency": 10,
+    "db_pool_max_conns_per_process": 12,
+    "watcher_batch_size": 1000,
+    "kafka_batch_size": 100,
+    "kafka_batch_timeout": "5ms",
+    "kafka_required_acks": "RequireAll",
+    "publication": "synchronous",
+    "job_runs_fillfactor": 70,
+    "autovacuum_naptime": "1min"
+  },
+  "durability": {
+    "durable": {
+      "synchronous_commit": "on",
+      "fsync": "on",
+      "shared_buffers": "128MB",
+      "max_wal_size": "1GB"
+    },
+    "bench": {
+      "synchronous_commit": "off",
+      "fsync": "on",
+      "shared_buffers": "512MB",
+      "max_wal_size": "4GB",
+      "relaxed_acknowledged_commit_durability": true
+    }
+  },
+  "hardware": {
+    "cpu": {
+      "lscpu": [
+        {
+          "field": "Architecture:",
+          "data": "x86_64"
+        },
+        {
+          "field": "CPU op-mode(s):",
+          "data": "32-bit, 64-bit"
+        },
+        {
+          "field": "Address sizes:",
+          "data": "48 bits physical, 48 bits virtual"
+        },
+        {
+          "field": "Byte Order:",
+          "data": "Little Endian"
+        },
+        {
+          "field": "CPU(s):",
+          "data": "12"
+        },
+        {
+          "field": "On-line CPU(s) list:",
+          "data": "0-11"
+        },
+        {
+          "field": "Vendor ID:",
+          "data": "AuthenticAMD"
+        },
+        {
+          "field": "Model name:",
+          "data": "AMD Ryzen 5 7600 6-Core Processor"
+        },
+        {
+          "field": "CPU family:",
+          "data": "25"
+        },
+        {
+          "field": "Model:",
+          "data": "97"
+        },
+        {
+          "field": "Thread(s) per core:",
+          "data": "2"
+        },
+        {
+          "field": "Core(s) per socket:",
+          "data": "6"
+        },
+        {
+          "field": "Socket(s):",
+          "data": "1"
+        },
+        {
+          "field": "Stepping:",
+          "data": "2"
+        },
+        {
+          "field": "Frequency boost:",
+          "data": "enabled"
+        },
+        {
+          "field": "CPU(s) scaling MHz:",
+          "data": "81%"
+        },
+        {
+          "field": "CPU max MHz:",
+          "data": "5171.8530"
+        },
+        {
+          "field": "CPU min MHz:",
+          "data": "405.0250"
+        },
+        {
+          "field": "BogoMIPS:",
+          "data": "7600.05"
+        },
+        {
+          "field": "Flags:",
+          "data": "fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good amd_lbr_v2 nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpuid_fault cpb cat_l3 cdp_l3 hw_pstate ssbd mba perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local user_shstk avx512_bf16 clzero irperf xsaveerptr rdpru wbnoinvd cppc arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic vgif x2avic v_spec_ctrl vnmi avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid overflow_recov succor smca fsrm flush_l1d amd_lbr_pmc_freeze"
+        },
+        {
+          "field": "Virtualization:",
+          "data": "AMD-V"
+        },
+        {
+          "field": "L1d cache:",
+          "data": "192 KiB (6 instances)"
+        },
+        {
+          "field": "L1i cache:",
+          "data": "192 KiB (6 instances)"
+        },
+        {
+          "field": "L2 cache:",
+          "data": "6 MiB (6 instances)"
+        },
+        {
+          "field": "L3 cache:",
+          "data": "32 MiB (1 instance)"
+        },
+        {
+          "field": "NUMA node(s):",
+          "data": "1"
+        },
+        {
+          "field": "NUMA node0 CPU(s):",
+          "data": "0-11"
+        },
+        {
+          "field": "Vulnerability Gather data sampling:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability Ghostwrite:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability Indirect target selection:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability Itlb multihit:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability L1tf:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability Mds:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability Meltdown:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability Mmio stale data:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability Old microcode:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability Reg file data sampling:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability Retbleed:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability Spec rstack overflow:",
+          "data": "Mitigation; Safe RET"
+        },
+        {
+          "field": "Vulnerability Spec store bypass:",
+          "data": "Mitigation; Speculative Store Bypass disabled via prctl"
+        },
+        {
+          "field": "Vulnerability Spectre v1:",
+          "data": "Mitigation; usercopy/swapgs barriers and __user pointer sanitization"
+        },
+        {
+          "field": "Vulnerability Spectre v2:",
+          "data": "Mitigation; Enhanced / Automatic IBRS; IBPB conditional; STIBP always-on; PBRSB-eIBRS Not affected; BHI Not affected"
+        },
+        {
+          "field": "Vulnerability Srbds:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability Tsa:",
+          "data": "Mitigation; Clear CPU buffers"
+        },
+        {
+          "field": "Vulnerability Tsx async abort:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability Vmscape:",
+          "data": "Mitigation; IBPB before exit to userspace"
+        }
+      ]
+    },
+    "ram_bytes": 15291961344,
+    "disks": {
+      "blockdevices": [
+        {
+          "name": "loop0",
+          "model": null,
+          "rota": false,
+          "size": "185.4M",
+          "mountpoints": [
+            "/snap/chromium/3554"
+          ]
+        },
+        {
+          "name": "loop1",
+          "model": null,
+          "rota": false,
+          "size": "182.2M",
+          "mountpoints": [
+            "/snap/chromium/3551"
+          ]
+        },
+        {
+          "name": "loop2",
+          "model": null,
+          "rota": false,
+          "size": "4K",
+          "mountpoints": [
+            "/snap/bare/5"
+          ]
+        },
+        {
+          "name": "loop3",
+          "model": null,
+          "rota": false,
+          "size": "510.2M",
+          "mountpoints": [
+            "/snap/code/265"
+          ]
+        },
+        {
+          "name": "loop4",
+          "model": null,
+          "rota": false,
+          "size": "55.5M",
+          "mountpoints": [
+            "/snap/core18/2999"
+          ]
+        },
+        {
+          "name": "loop5",
+          "model": null,
+          "rota": false,
+          "size": "517.6M",
+          "mountpoints": [
+            "/snap/code/267"
+          ]
+        },
+        {
+          "name": "loop6",
+          "model": null,
+          "rota": false,
+          "size": "55.5M",
+          "mountpoints": [
+            "/snap/core18/3084"
+          ]
+        },
+        {
+          "name": "loop7",
+          "model": null,
+          "rota": false,
+          "size": "63.8M",
+          "mountpoints": [
+            "/snap/core20/2866"
+          ]
+        },
+        {
+          "name": "loop8",
+          "model": null,
+          "rota": false,
+          "size": "63.8M",
+          "mountpoints": [
+            "/snap/core20/2922"
+          ]
+        },
+        {
+          "name": "loop9",
+          "model": null,
+          "rota": false,
+          "size": "74M",
+          "mountpoints": [
+            "/snap/core22/2437"
+          ]
+        },
+        {
+          "name": "loop10",
+          "model": null,
+          "rota": false,
+          "size": "74M",
+          "mountpoints": [
+            "/snap/core22/2955"
+          ]
+        },
+        {
+          "name": "loop11",
+          "model": null,
+          "rota": false,
+          "size": "66.8M",
+          "mountpoints": [
+            "/snap/core24/2124"
+          ]
+        },
+        {
+          "name": "loop12",
+          "model": null,
+          "rota": false,
+          "size": "66.8M",
+          "mountpoints": [
+            "/snap/core24/1643"
+          ]
+        },
+        {
+          "name": "loop13",
+          "model": null,
+          "rota": false,
+          "size": "60.1M",
+          "mountpoints": [
+            "/snap/core26/462"
+          ]
+        },
+        {
+          "name": "loop14",
+          "model": null,
+          "rota": false,
+          "size": "60.6M",
+          "mountpoints": [
+            "/snap/core26/646"
+          ]
+        },
+        {
+          "name": "loop15",
+          "model": null,
+          "rota": false,
+          "size": "47.9M",
+          "mountpoints": [
+            "/snap/cups/1238"
+          ]
+        },
+        {
+          "name": "loop16",
+          "model": null,
+          "rota": false,
+          "size": "50.7M",
+          "mountpoints": [
+            "/snap/cups/1262"
+          ]
+        },
+        {
+          "name": "loop17",
+          "model": null,
+          "rota": false,
+          "size": "14.2M",
+          "mountpoints": [
+            "/snap/desktop-security-center/188"
+          ]
+        },
+        {
+          "name": "loop18",
+          "model": null,
+          "rota": false,
+          "size": "14.2M",
+          "mountpoints": [
+            "/snap/desktop-security-center/206"
+          ]
+        },
+        {
+          "name": "loop19",
+          "model": null,
+          "rota": false,
+          "size": "262.4M",
+          "mountpoints": [
+            "/snap/discord/311"
+          ]
+        },
+        {
+          "name": "loop20",
+          "model": null,
+          "rota": false,
+          "size": "262.5M",
+          "mountpoints": [
+            "/snap/discord/313"
+          ]
+        },
+        {
+          "name": "loop21",
+          "model": null,
+          "rota": false,
+          "size": "261.4M",
+          "mountpoints": [
+            "/snap/firefox/8969"
+          ]
+        },
+        {
+          "name": "loop22",
+          "model": null,
+          "rota": false,
+          "size": "16.5M",
+          "mountpoints": [
+            "/snap/firmware-updater/226"
+          ]
+        },
+        {
+          "name": "loop23",
+          "model": null,
+          "rota": false,
+          "size": "12.7M",
+          "mountpoints": [
+            "/snap/firmware-updater/262"
+          ]
+        },
+        {
+          "name": "loop24",
+          "model": null,
+          "rota": false,
+          "size": "262.2M",
+          "mountpoints": [
+            "/snap/firefox/8995"
+          ]
+        },
+        {
+          "name": "loop25",
+          "model": null,
+          "rota": false,
+          "size": "242.6M",
+          "mountpoints": [
+            "/snap/gaming-graphics-core24/13"
+          ]
+        },
+        {
+          "name": "loop26",
+          "model": null,
+          "rota": false,
+          "size": "164.8M",
+          "mountpoints": [
+            "/snap/gnome-3-28-1804/198"
+          ]
+        },
+        {
+          "name": "loop27",
+          "model": null,
+          "rota": false,
+          "size": "531.4M",
+          "mountpoints": [
+            "/snap/gnome-42-2204/247"
+          ]
+        },
+        {
+          "name": "loop28",
+          "model": null,
+          "rota": false,
+          "size": "531.5M",
+          "mountpoints": [
+            "/snap/gnome-42-2204/263"
+          ]
+        },
+        {
+          "name": "loop29",
+          "model": null,
+          "rota": false,
+          "size": "606.1M",
+          "mountpoints": [
+            "/snap/gnome-46-2404/153"
+          ]
+        },
+        {
+          "name": "loop30",
+          "model": null,
+          "rota": false,
+          "size": "91.7M",
+          "mountpoints": [
+            "/snap/gtk-common-themes/1535"
+          ]
+        },
+        {
+          "name": "loop31",
+          "model": null,
+          "rota": false,
+          "size": "1.6G",
+          "mountpoints": [
+            "/snap/kf6-core24/64"
+          ]
+        },
+        {
+          "name": "loop32",
+          "model": null,
+          "rota": false,
+          "size": "614.5M",
+          "mountpoints": [
+            "/snap/gnome-46-2404/164"
+          ]
+        },
+        {
+          "name": "loop33",
+          "model": null,
+          "rota": false,
+          "size": "395M",
+          "mountpoints": [
+            "/snap/mesa-2404/1165"
+          ]
+        },
+        {
+          "name": "loop34",
+          "model": null,
+          "rota": false,
+          "size": "402M",
+          "mountpoints": [
+            "/snap/mesa-2404/1839"
+          ]
+        },
+        {
+          "name": "loop35",
+          "model": null,
+          "rota": false,
+          "size": "18.8M",
+          "mountpoints": [
+            "/snap/prompting-client/222"
+          ]
+        },
+        {
+          "name": "loop36",
+          "model": null,
+          "rota": false,
+          "size": "18.4M",
+          "mountpoints": [
+            "/snap/prompting-client/228"
+          ]
+        },
+        {
+          "name": "loop37",
+          "model": null,
+          "rota": false,
+          "size": "11.8M",
+          "mountpoints": [
+            "/snap/snap-store/1390"
+          ]
+        },
+        {
+          "name": "loop38",
+          "model": null,
+          "rota": false,
+          "size": "11.8M",
+          "mountpoints": [
+            "/snap/snap-store/1419"
+          ]
+        },
+        {
+          "name": "loop39",
+          "model": null,
+          "rota": false,
+          "size": "117.8M",
+          "mountpoints": [
+            "/snap/superproductivity/4925"
+          ]
+        },
+        {
+          "name": "loop40",
+          "model": null,
+          "rota": false,
+          "size": "50.3M",
+          "mountpoints": [
+            "/snap/snapd/27738"
+          ]
+        },
+        {
+          "name": "loop41",
+          "model": null,
+          "rota": false,
+          "size": "44.7M",
+          "mountpoints": [
+            "/snap/snapd/28254"
+          ]
+        },
+        {
+          "name": "loop42",
+          "model": null,
+          "rota": false,
+          "size": "828K",
+          "mountpoints": [
+            "/snap/snapd-desktop-integration/391"
+          ]
+        },
+        {
+          "name": "loop43",
+          "model": null,
+          "rota": false,
+          "size": "291.2M",
+          "mountpoints": [
+            "/snap/steam/271"
+          ]
+        },
+        {
+          "name": "loop44",
+          "model": null,
+          "rota": false,
+          "size": "291.2M",
+          "mountpoints": [
+            "/snap/steam/279"
+          ]
+        },
+        {
+          "name": "loop45",
+          "model": null,
+          "rota": false,
+          "size": "828K",
+          "mountpoints": [
+            "/snap/snapd-desktop-integration/387"
+          ]
+        },
+        {
+          "name": "loop46",
+          "model": null,
+          "rota": false,
+          "size": "117.7M",
+          "mountpoints": [
+            "/snap/superproductivity/4688"
+          ]
+        },
+        {
+          "name": "loop47",
+          "model": null,
+          "rota": false,
+          "size": "264.8M",
+          "mountpoints": [
+            "/snap/vlc/4472"
+          ]
+        },
+        {
+          "name": "loop48",
+          "model": null,
+          "rota": false,
+          "size": "321.1M",
+          "mountpoints": [
+            "/snap/vlc/3777"
+          ]
+        },
+        {
+          "name": "nvme0n1",
+          "model": "Acer SSD FA100 512GB",
+          "rota": false,
+          "size": "476.9G",
+          "mountpoints": [],
+          "children": [
+            {
+              "name": "nvme0n1p1",
+              "model": null,
+              "rota": false,
+              "size": "1G",
+              "mountpoints": [
+                "/boot/efi"
+              ]
+            },
+            {
+              "name": "nvme0n1p2",
+              "model": null,
+              "rota": false,
+              "size": "475.9G",
+              "mountpoints": [
+                "/"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "platform": "Linux-6.17.0-41-generic-x86_64-with-glibc2.42",
+    "generator_shares_host": true
+  },
+  "definitions": {
+    "ingest": "Fresh201 accepted measurement jobs / actual load window, at least the requested duration.",
+    "herd_dispatch": "50000 / (last queued_at - common scheduled_for), persisted statement timestamps.",
+    "herd_successful_drain": "50000 / (last finished_at - common scheduled_for), persisted statement timestamps.",
+    "soak_success": "Sum executions_total result=succeeded counter delta / its scrape-aligned window inside load. Exact endpoints in each execution_counter.",
+    "soak_db_rates": "Persisted dispatch/success transitions inside the load window / load-window seconds; can include late warmup finishes and exclude drain.",
+    "sql_start_p99": "Exact measurement job cohort percentile of started_at - scheduled_for, includes drain starts.",
+    "prometheus_start_p99": "Histogram estimate after summing replica buckets; load temporal window differs from cohort. Dashboard uses rolling rate windows.",
+    "cpu_percent": "Docker sampled CPU; 100% is one logical CPU. Resource summaries filter sample timestamps to the reported measurement window."
+  },
+  "aggregates": {
+    "durable": {
+      "ingest": {
+        "ingest_jobs_per_second": {
+          "median": 5001.249906175207,
+          "minimum": 5000.0,
+          "maximum": 5001.249906175207
+        }
+      },
+      "herd": {
+        "dispatch_jobs_per_second": {
+          "median": 19780.21128110925,
+          "minimum": 19708.76744456618,
+          "maximum": 19877.814800723474
+        },
+        "successful_jobs_per_second": {
+          "median": 5472.677309787165,
+          "minimum": 5435.6262185858095,
+          "maximum": 5795.834006632198
+        },
+        "start_p99_seconds": {
+          "median": 8.955901370000001,
+          "minimum": 8.474994090000001,
+          "maximum": 8.98414546
+        }
+      }
+    },
+    "bench": {
+      "ingest": {
+        "ingest_jobs_per_second": {
+          "median": 5000.0,
+          "minimum": 5000.0,
+          "maximum": 5001.333248742762
+        }
+      },
+      "herd": {
+        "dispatch_jobs_per_second": {
+          "median": 16469.461062796167,
+          "minimum": 16370.571015963467,
+          "maximum": 17191.181014114354
+        },
+        "successful_jobs_per_second": {
+          "median": 8868.128644596958,
+          "minimum": 8664.909075043168,
+          "maximum": 8934.731680100314
+        },
+        "start_p99_seconds": {
+          "median": 5.58549904,
+          "minimum": 5.53574913,
+          "maximum": 5.7206295
+        }
+      }
+    }
+  },
+  "runs": [
+    {
+      "run_directory": "20261014T131329Z-d9deb2-durable-ingest",
+      "profile": "durable",
+      "scenario": "ingest",
+      "repeat": 1,
+      "command": [
+        "make",
+        "bench",
+        "BENCH_PROFILE=durable",
+        "BENCH_SCENARIO=ingest",
+        "BENCH_RATE=5000",
+        "BENCH_DURATION=60",
+        "BENCH_WARMUP=0",
+        "BENCH_HERD_JOBS=50000",
+        "BENCH_HERD_LEAD=30",
+        "BENCH_DRAIN_TIMEOUT=300",
+        "BENCH_SCREENSHOTS=0"
+      ],
+      "summary": {
+        "scenario": "ingest",
+        "accepted_jobs": 300100,
+        "measurement_accepted_jobs": 300100,
+        "offered_jobs_per_second": 5000,
+        "window_start": 1791983620.312,
+        "window_end": 1791983680.317,
+        "window_seconds": 60.00499987602234,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": 5001.249906175207,
+          "dispatch_jobs_per_second": null,
+          "successful_jobs_per_second": null
+        },
+        "start_latency_seconds": {
+          "max": null,
+          "p50": null,
+          "p95": null,
+          "p99": null,
+          "count": 0
+        },
+        "drain_seconds": 0,
+        "profile": "durable",
+        "k6_exit_code": 0,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 0.6327590480000254,
+        "aborted_for_overload": false,
+        "completed_measurement": true,
+        "execution_counter": {
+          "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+          "window_start": 1791983624.945,
+          "window_end": 1791983679.945,
+          "window_seconds": 55.0,
+          "samples": 12,
+          "successful_executions": 0.0,
+          "successful_jobs_per_second": 0.0
+        }
+      },
+      "raw_audit": {
+        "accepted_jobs": 300100,
+        "measurement_accepted_jobs": 300100,
+        "rejected_batches": 0,
+        "fresh_201_batches": 3001,
+        "http_req_failed": 0
+      },
+      "reconciliation": {
+        "jobs": 300100,
+        "runs": 300100,
+        "jobs_with_runs": 300100,
+        "attempt_rows": 0,
+        "statuses": {
+          "PENDING": 300100
+        },
+        "invalid_runs": 0,
+        "invalid_attempts": 0,
+        "last_queued": null,
+        "last_finished": null,
+        "due_min": 1791984010.312,
+        "due_max": 1791984010.312,
+        "dispatches_in_window": 0,
+        "successes_in_window": 0
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "1024",
+        "shared_buffers": "16384",
+        "max_connections": "100",
+        "autovacuum_naptime": "60",
+        "synchronous_commit": "on",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "resources": {
+        "generator": {
+          "samples": 8,
+          "cpu_percent_median": 9.82,
+          "cpu_percent_max": 11.09,
+          "ram_bytes_peak": 85616230.4
+        },
+        "executor": {
+          "samples": 8,
+          "cpu_percent_median": 0.045,
+          "cpu_percent_max": 0.25,
+          "ram_bytes_peak": 48762978.304000005
+        },
+        "api": {
+          "samples": 8,
+          "cpu_percent_median": 10.94,
+          "cpu_percent_max": 11.78,
+          "ram_bytes_peak": 40097546.24
+        },
+        "watcher": {
+          "samples": 8,
+          "cpu_percent_median": 0.715,
+          "cpu_percent_max": 0.83,
+          "ram_bytes_peak": 37664849.92
+        },
+        "grafana": {
+          "samples": 8,
+          "cpu_percent_median": 3.05,
+          "cpu_percent_max": 15.04,
+          "ram_bytes_peak": 493145292.8
+        },
+        "redis": {
+          "samples": 8,
+          "cpu_percent_median": 0.11,
+          "cpu_percent_max": 1.98,
+          "ram_bytes_peak": 11481907.2
+        },
+        "postgres": {
+          "samples": 8,
+          "cpu_percent_median": 8.149999999999999,
+          "cpu_percent_max": 26.2,
+          "ram_bytes_peak": 211078348.8
+        },
+        "kafka": {
+          "samples": 8,
+          "cpu_percent_median": 2.6149999999999998,
+          "cpu_percent_max": 120.11,
+          "ram_bytes_peak": 483393536.0
+        },
+        "prometheus": {
+          "samples": 8,
+          "cpu_percent_median": 0.105,
+          "cpu_percent_max": 1.84,
+          "ram_bytes_peak": 105277030.4
+        },
+        "echo": {
+          "samples": 8,
+          "cpu_percent_median": 0.0,
+          "cpu_percent_max": 0.0,
+          "ram_bytes_peak": 5500829.696
+        }
+      },
+      "resource_sample_errors": 1,
+      "prometheus_peaks": {
+        "pool_saturation": 0.0,
+        "lag": 0.0,
+        "inflight": 0.0
+      },
+      "backlog": [],
+      "git_commit": "afb727e5e5601d184d4b47720586a4fea299da80"
+    },
+    {
+      "run_directory": "20261014T131556Z-027cd1-bench-ingest",
+      "profile": "bench",
+      "scenario": "ingest",
+      "repeat": 1,
+      "command": [
+        "make",
+        "bench",
+        "BENCH_PROFILE=bench",
+        "BENCH_SCENARIO=ingest",
+        "BENCH_RATE=5000",
+        "BENCH_DURATION=60",
+        "BENCH_WARMUP=0",
+        "BENCH_HERD_JOBS=50000",
+        "BENCH_HERD_LEAD=30",
+        "BENCH_DRAIN_TIMEOUT=300",
+        "BENCH_SCREENSHOTS=0"
+      ],
+      "summary": {
+        "scenario": "ingest",
+        "accepted_jobs": 300000,
+        "measurement_accepted_jobs": 300000,
+        "offered_jobs_per_second": 5000,
+        "window_start": 1791983767.263,
+        "window_end": 1791983827.263,
+        "window_seconds": 60.0,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": 5000.0,
+          "dispatch_jobs_per_second": null,
+          "successful_jobs_per_second": null
+        },
+        "start_latency_seconds": {
+          "max": null,
+          "p50": null,
+          "p95": null,
+          "p99": null,
+          "count": 0
+        },
+        "drain_seconds": 0,
+        "profile": "bench",
+        "k6_exit_code": 0,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 0.6002495909999652,
+        "aborted_for_overload": false,
+        "completed_measurement": true,
+        "execution_counter": {
+          "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+          "window_start": 1791983771.981,
+          "window_end": 1791983826.981,
+          "window_seconds": 55.0,
+          "samples": 12,
+          "successful_executions": 0.0,
+          "successful_jobs_per_second": 0.0
+        }
+      },
+      "raw_audit": {
+        "accepted_jobs": 300000,
+        "measurement_accepted_jobs": 300000,
+        "rejected_batches": 0,
+        "fresh_201_batches": 3000,
+        "http_req_failed": 0
+      },
+      "reconciliation": {
+        "jobs": 300000,
+        "runs": 300000,
+        "jobs_with_runs": 300000,
+        "attempt_rows": 0,
+        "statuses": {
+          "PENDING": 300000
+        },
+        "invalid_runs": 0,
+        "invalid_attempts": 0,
+        "last_queued": null,
+        "last_finished": null,
+        "due_min": 1791984157.263,
+        "due_max": 1791984157.263,
+        "dispatches_in_window": 0,
+        "successes_in_window": 0
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "4096",
+        "shared_buffers": "65536",
+        "max_connections": "100",
+        "autovacuum_naptime": "60",
+        "synchronous_commit": "off",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "resources": {
+        "generator": {
+          "samples": 8,
+          "cpu_percent_median": 9.64,
+          "cpu_percent_max": 11.02,
+          "ram_bytes_peak": 52628029.44
+        },
+        "executor": {
+          "samples": 8,
+          "cpu_percent_median": 0.105,
+          "cpu_percent_max": 0.57,
+          "ram_bytes_peak": 32237420.544
+        },
+        "api": {
+          "samples": 8,
+          "cpu_percent_median": 10.969999999999999,
+          "cpu_percent_max": 11.29,
+          "ram_bytes_peak": 15676211.2
+        },
+        "watcher": {
+          "samples": 8,
+          "cpu_percent_median": 0.7,
+          "cpu_percent_max": 0.94,
+          "ram_bytes_peak": 22003318.784
+        },
+        "grafana": {
+          "samples": 8,
+          "cpu_percent_median": 1.92,
+          "cpu_percent_max": 4.23,
+          "ram_bytes_peak": 258788556.8
+        },
+        "redis": {
+          "samples": 8,
+          "cpu_percent_median": 0.12,
+          "cpu_percent_max": 1.9,
+          "ram_bytes_peak": 6536822.784
+        },
+        "postgres": {
+          "samples": 8,
+          "cpu_percent_median": 7.895,
+          "cpu_percent_max": 26.32,
+          "ram_bytes_peak": 215377510.4
+        },
+        "kafka": {
+          "samples": 8,
+          "cpu_percent_median": 2.8449999999999998,
+          "cpu_percent_max": 123.63,
+          "ram_bytes_peak": 412509798.4
+        },
+        "prometheus": {
+          "samples": 8,
+          "cpu_percent_median": 0.125,
+          "cpu_percent_max": 2.1,
+          "ram_bytes_peak": 38356910.08
+        },
+        "echo": {
+          "samples": 8,
+          "cpu_percent_median": 0.0,
+          "cpu_percent_max": 0.0,
+          "ram_bytes_peak": 1429209.088
+        }
+      },
+      "resource_sample_errors": 1,
+      "prometheus_peaks": {
+        "pool_saturation": 0.0,
+        "lag": 0.0,
+        "inflight": 0.0
+      },
+      "backlog": [],
+      "git_commit": "afb727e5e5601d184d4b47720586a4fea299da80"
+    },
+    {
+      "run_directory": "20261014T131822Z-244930-durable-herd",
+      "profile": "durable",
+      "scenario": "herd",
+      "repeat": 1,
+      "command": [
+        "make",
+        "bench",
+        "BENCH_PROFILE=durable",
+        "BENCH_SCENARIO=herd",
+        "BENCH_RATE=5000",
+        "BENCH_DURATION=60",
+        "BENCH_WARMUP=0",
+        "BENCH_HERD_JOBS=50000",
+        "BENCH_HERD_LEAD=30",
+        "BENCH_DRAIN_TIMEOUT=300",
+        "BENCH_SCREENSHOTS=0"
+      ],
+      "summary": {
+        "scenario": "herd",
+        "accepted_jobs": 50000,
+        "measurement_accepted_jobs": 50000,
+        "offered_jobs_per_second": null,
+        "window_start": 1791983942.833,
+        "window_end": 1791983952.031572,
+        "window_seconds": 9.198572158813477,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": null,
+          "dispatch_jobs_per_second": 19708.76744456618,
+          "successful_jobs_per_second": 5435.6262185858095
+        },
+        "start_latency_seconds": {
+          "max": 9.196922,
+          "p50": 4.8519015,
+          "p95": 8.6346855,
+          "p99": 8.955901370000001,
+          "count": 50000
+        },
+        "drain_seconds": 9.198572158813477,
+        "profile": "durable",
+        "k6_exit_code": 0,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 10.700767555999846,
+        "aborted_for_overload": false,
+        "completed_measurement": true,
+        "execution_counter": null
+      },
+      "raw_audit": {
+        "accepted_jobs": 50000,
+        "measurement_accepted_jobs": 50000,
+        "rejected_batches": 0,
+        "fresh_201_batches": 500,
+        "http_req_failed": 0
+      },
+      "reconciliation": {
+        "jobs": 50000,
+        "runs": 50000,
+        "jobs_with_runs": 50000,
+        "attempt_rows": 50000,
+        "statuses": {
+          "SUCCEEDED": 50000
+        },
+        "invalid_runs": 0,
+        "invalid_attempts": 0,
+        "last_queued": 1791983945.369942,
+        "last_finished": 1791983952.031572,
+        "due_min": 1791983942.833,
+        "due_max": 1791983942.833,
+        "dispatches_in_window": 0,
+        "successes_in_window": 0
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "1024",
+        "shared_buffers": "16384",
+        "max_connections": "100",
+        "autovacuum_naptime": "60",
+        "synchronous_commit": "on",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "resources": {
+        "watcher": {
+          "samples": 2,
+          "cpu_percent_median": 0.9349999999999999,
+          "cpu_percent_max": 1.1099999999999999,
+          "ram_bytes_peak": 23131586.560000002
+        },
+        "executor": {
+          "samples": 2,
+          "cpu_percent_median": 78.155,
+          "cpu_percent_max": 156.29,
+          "ram_bytes_peak": 40883978.24
+        },
+        "api": {
+          "samples": 2,
+          "cpu_percent_median": 0.14,
+          "cpu_percent_max": 0.28,
+          "ram_bytes_peak": 14638120.96
+        },
+        "grafana": {
+          "samples": 2,
+          "cpu_percent_median": 11.48,
+          "cpu_percent_max": 20.63,
+          "ram_bytes_peak": 260256563.2
+        },
+        "postgres": {
+          "samples": 2,
+          "cpu_percent_median": 100.685,
+          "cpu_percent_max": 200.81,
+          "ram_bytes_peak": 189058252.8
+        },
+        "redis": {
+          "samples": 2,
+          "cpu_percent_median": 1.265,
+          "cpu_percent_max": 2.42,
+          "ram_bytes_peak": 6263144.448
+        },
+        "kafka": {
+          "samples": 2,
+          "cpu_percent_median": 128.63,
+          "cpu_percent_max": 174.97,
+          "ram_bytes_peak": 508349644.8
+        },
+        "prometheus": {
+          "samples": 2,
+          "cpu_percent_median": 1.125,
+          "cpu_percent_max": 2.18,
+          "ram_bytes_peak": 43473960.96
+        },
+        "echo": {
+          "samples": 2,
+          "cpu_percent_median": 0.0,
+          "cpu_percent_max": 0.0,
+          "ram_bytes_peak": 1425014.784
+        }
+      },
+      "resource_sample_errors": 0,
+      "prometheus_peaks": {
+        "pool_saturation": 0.5,
+        "lag": 31521.0,
+        "inflight": 0.0
+      },
+      "backlog": [],
+      "git_commit": "afb727e5e5601d184d4b47720586a4fea299da80"
+    },
+    {
+      "run_directory": "20261014T132021Z-0c1b29-bench-herd",
+      "profile": "bench",
+      "scenario": "herd",
+      "repeat": 1,
+      "command": [
+        "make",
+        "bench",
+        "BENCH_PROFILE=bench",
+        "BENCH_SCENARIO=herd",
+        "BENCH_RATE=5000",
+        "BENCH_DURATION=60",
+        "BENCH_WARMUP=0",
+        "BENCH_HERD_JOBS=50000",
+        "BENCH_HERD_LEAD=30",
+        "BENCH_DRAIN_TIMEOUT=300",
+        "BENCH_SCREENSHOTS=0"
+      ],
+      "summary": {
+        "scenario": "herd",
+        "accepted_jobs": 50000,
+        "measurement_accepted_jobs": 50000,
+        "offered_jobs_per_second": null,
+        "window_start": 1791984061.991,
+        "window_end": 1791984067.761401,
+        "window_seconds": 5.7704010009765625,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": null,
+          "dispatch_jobs_per_second": 16469.461062796167,
+          "successful_jobs_per_second": 8664.909075043168
+        },
+        "start_latency_seconds": {
+          "max": 5.770077,
+          "p50": 3.621013,
+          "p95": 5.57535975,
+          "p99": 5.7206295,
+          "count": 50000
+        },
+        "drain_seconds": 5.7704010009765625,
+        "profile": "bench",
+        "k6_exit_code": 0,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 5.661655612000004,
+        "aborted_for_overload": false,
+        "completed_measurement": true,
+        "execution_counter": null
+      },
+      "raw_audit": {
+        "accepted_jobs": 50000,
+        "measurement_accepted_jobs": 50000,
+        "rejected_batches": 0,
+        "fresh_201_batches": 500,
+        "http_req_failed": 0
+      },
+      "reconciliation": {
+        "jobs": 50000,
+        "runs": 50000,
+        "jobs_with_runs": 50000,
+        "attempt_rows": 50000,
+        "statuses": {
+          "SUCCEEDED": 50000
+        },
+        "invalid_runs": 0,
+        "invalid_attempts": 0,
+        "last_queued": 1791984065.026922,
+        "last_finished": 1791984067.761401,
+        "due_min": 1791984061.991,
+        "due_max": 1791984061.991,
+        "dispatches_in_window": 0,
+        "successes_in_window": 0
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "4096",
+        "shared_buffers": "65536",
+        "max_connections": "100",
+        "autovacuum_naptime": "60",
+        "synchronous_commit": "off",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "resources": {
+        "watcher": {
+          "samples": 1,
+          "cpu_percent_median": 0.8899999999999999,
+          "cpu_percent_max": 0.8899999999999999,
+          "ram_bytes_peak": 21451767.808
+        },
+        "executor": {
+          "samples": 1,
+          "cpu_percent_median": 284.68,
+          "cpu_percent_max": 284.68,
+          "ram_bytes_peak": 42865786.88
+        },
+        "api": {
+          "samples": 1,
+          "cpu_percent_median": 0.0,
+          "cpu_percent_max": 0.0,
+          "ram_bytes_peak": 13788774.4
+        },
+        "grafana": {
+          "samples": 1,
+          "cpu_percent_median": 4.15,
+          "cpu_percent_max": 4.15,
+          "ram_bytes_peak": 258683699.2
+        },
+        "redis": {
+          "samples": 1,
+          "cpu_percent_median": 2.57,
+          "cpu_percent_max": 2.57,
+          "ram_bytes_peak": 6012534.784
+        },
+        "postgres": {
+          "samples": 1,
+          "cpu_percent_median": 361.95,
+          "cpu_percent_max": 361.95,
+          "ram_bytes_peak": 208666624.0
+        },
+        "kafka": {
+          "samples": 1,
+          "cpu_percent_median": 325.03,
+          "cpu_percent_max": 325.03,
+          "ram_bytes_peak": 482030387.2
+        },
+        "prometheus": {
+          "samples": 1,
+          "cpu_percent_median": 2.51,
+          "cpu_percent_max": 2.51,
+          "ram_bytes_peak": 34917580.8
+        },
+        "echo": {
+          "samples": 1,
+          "cpu_percent_median": 0.0,
+          "cpu_percent_max": 0.0,
+          "ram_bytes_peak": 1298137.088
+        }
+      },
+      "resource_sample_errors": 0,
+      "prometheus_peaks": {
+        "pool_saturation": 0.5833333333333334,
+        "lag": 18237.0,
+        "inflight": 0.0
+      },
+      "backlog": [],
+      "git_commit": "afb727e5e5601d184d4b47720586a4fea299da80"
+    },
+    {
+      "run_directory": "20261014T132217Z-ea7cfa-durable-ingest",
+      "profile": "durable",
+      "scenario": "ingest",
+      "repeat": 2,
+      "command": [
+        "make",
+        "bench",
+        "BENCH_PROFILE=durable",
+        "BENCH_SCENARIO=ingest",
+        "BENCH_RATE=5000",
+        "BENCH_DURATION=60",
+        "BENCH_WARMUP=0",
+        "BENCH_HERD_JOBS=50000",
+        "BENCH_HERD_LEAD=30",
+        "BENCH_DRAIN_TIMEOUT=300",
+        "BENCH_SCREENSHOTS=0"
+      ],
+      "summary": {
+        "scenario": "ingest",
+        "accepted_jobs": 300000,
+        "measurement_accepted_jobs": 300000,
+        "offered_jobs_per_second": 5000,
+        "window_start": 1791984147.901,
+        "window_end": 1791984207.901,
+        "window_seconds": 60.0,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": 5000.0,
+          "dispatch_jobs_per_second": null,
+          "successful_jobs_per_second": null
+        },
+        "start_latency_seconds": {
+          "max": null,
+          "p50": null,
+          "p95": null,
+          "p99": null,
+          "count": 0
+        },
+        "drain_seconds": 0,
+        "profile": "durable",
+        "k6_exit_code": 0,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 0.6323202220000894,
+        "aborted_for_overload": false,
+        "completed_measurement": true,
+        "execution_counter": {
+          "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+          "window_start": 1791984152.479,
+          "window_end": 1791984207.479,
+          "window_seconds": 55.0,
+          "samples": 12,
+          "successful_executions": 0.0,
+          "successful_jobs_per_second": 0.0
+        }
+      },
+      "raw_audit": {
+        "accepted_jobs": 300000,
+        "measurement_accepted_jobs": 300000,
+        "rejected_batches": 0,
+        "fresh_201_batches": 3000,
+        "http_req_failed": 0
+      },
+      "reconciliation": {
+        "jobs": 300000,
+        "runs": 300000,
+        "jobs_with_runs": 300000,
+        "attempt_rows": 0,
+        "statuses": {
+          "PENDING": 300000
+        },
+        "invalid_runs": 0,
+        "invalid_attempts": 0,
+        "last_queued": null,
+        "last_finished": null,
+        "due_min": 1791984537.901,
+        "due_max": 1791984537.901,
+        "dispatches_in_window": 0,
+        "successes_in_window": 0
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "1024",
+        "shared_buffers": "16384",
+        "max_connections": "100",
+        "autovacuum_naptime": "60",
+        "synchronous_commit": "on",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "resources": {
+        "generator": {
+          "samples": 8,
+          "cpu_percent_median": 9.725,
+          "cpu_percent_max": 10.3,
+          "ram_bytes_peak": 51485081.6
+        },
+        "watcher": {
+          "samples": 8,
+          "cpu_percent_median": 0.63,
+          "cpu_percent_max": 0.9099999999999999,
+          "ram_bytes_peak": 21831352.32
+        },
+        "executor": {
+          "samples": 8,
+          "cpu_percent_median": 0.05,
+          "cpu_percent_max": 0.21000000000000002,
+          "ram_bytes_peak": 30812405.759999998
+        },
+        "api": {
+          "samples": 8,
+          "cpu_percent_median": 10.47,
+          "cpu_percent_max": 11.2,
+          "ram_bytes_peak": 16158556.16
+        },
+        "grafana": {
+          "samples": 8,
+          "cpu_percent_median": 3.42,
+          "cpu_percent_max": 9.14,
+          "ram_bytes_peak": 275356057.6
+        },
+        "redis": {
+          "samples": 8,
+          "cpu_percent_median": 0.11,
+          "cpu_percent_max": 2.03,
+          "ram_bytes_peak": 6263144.448
+        },
+        "postgres": {
+          "samples": 8,
+          "cpu_percent_median": 7.87,
+          "cpu_percent_max": 11.55,
+          "ram_bytes_peak": 197551718.4
+        },
+        "kafka": {
+          "samples": 8,
+          "cpu_percent_median": 3.4349999999999996,
+          "cpu_percent_max": 137.68,
+          "ram_bytes_peak": 423414988.8
+        },
+        "prometheus": {
+          "samples": 8,
+          "cpu_percent_median": 0.11,
+          "cpu_percent_max": 2.14,
+          "ram_bytes_peak": 38566625.28
+        },
+        "echo": {
+          "samples": 8,
+          "cpu_percent_median": 0.0,
+          "cpu_percent_max": 0.0,
+          "ram_bytes_peak": 1375731.712
+        }
+      },
+      "resource_sample_errors": 1,
+      "prometheus_peaks": {
+        "pool_saturation": 0.0,
+        "lag": 0.0,
+        "inflight": 0.0
+      },
+      "backlog": [],
+      "git_commit": "afb727e5e5601d184d4b47720586a4fea299da80"
+    },
+    {
+      "run_directory": "20261014T132432Z-f4f2b0-bench-ingest",
+      "profile": "bench",
+      "scenario": "ingest",
+      "repeat": 2,
+      "command": [
+        "make",
+        "bench",
+        "BENCH_PROFILE=bench",
+        "BENCH_SCENARIO=ingest",
+        "BENCH_RATE=5000",
+        "BENCH_DURATION=60",
+        "BENCH_WARMUP=0",
+        "BENCH_HERD_JOBS=50000",
+        "BENCH_HERD_LEAD=30",
+        "BENCH_DRAIN_TIMEOUT=300",
+        "BENCH_SCREENSHOTS=0"
+      ],
+      "summary": {
+        "scenario": "ingest",
+        "accepted_jobs": 300100,
+        "measurement_accepted_jobs": 300100,
+        "offered_jobs_per_second": 5000,
+        "window_start": 1791984282.895,
+        "window_end": 1791984342.899,
+        "window_seconds": 60.00399994850159,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": 5001.333248742762,
+          "dispatch_jobs_per_second": null,
+          "successful_jobs_per_second": null
+        },
+        "start_latency_seconds": {
+          "max": null,
+          "p50": null,
+          "p95": null,
+          "p99": null,
+          "count": 0
+        },
+        "drain_seconds": 0,
+        "profile": "bench",
+        "k6_exit_code": 0,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 0.6310387739999896,
+        "aborted_for_overload": false,
+        "completed_measurement": true,
+        "execution_counter": {
+          "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+          "window_start": 1791984287.582,
+          "window_end": 1791984342.582,
+          "window_seconds": 55.0,
+          "samples": 12,
+          "successful_executions": 0.0,
+          "successful_jobs_per_second": 0.0
+        }
+      },
+      "raw_audit": {
+        "accepted_jobs": 300100,
+        "measurement_accepted_jobs": 300100,
+        "rejected_batches": 0,
+        "fresh_201_batches": 3001,
+        "http_req_failed": 0
+      },
+      "reconciliation": {
+        "jobs": 300100,
+        "runs": 300100,
+        "jobs_with_runs": 300100,
+        "attempt_rows": 0,
+        "statuses": {
+          "PENDING": 300100
+        },
+        "invalid_runs": 0,
+        "invalid_attempts": 0,
+        "last_queued": null,
+        "last_finished": null,
+        "due_min": 1791984672.895,
+        "due_max": 1791984672.895,
+        "dispatches_in_window": 0,
+        "successes_in_window": 0
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "4096",
+        "shared_buffers": "65536",
+        "max_connections": "100",
+        "autovacuum_naptime": "60",
+        "synchronous_commit": "off",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "resources": {
+        "generator": {
+          "samples": 8,
+          "cpu_percent_median": 9.559999999999999,
+          "cpu_percent_max": 10.67,
+          "ram_bytes_peak": 50761564.16
+        },
+        "api": {
+          "samples": 8,
+          "cpu_percent_median": 10.75,
+          "cpu_percent_max": 11.26,
+          "ram_bytes_peak": 15466496.0
+        },
+        "executor": {
+          "samples": 8,
+          "cpu_percent_median": 0.06,
+          "cpu_percent_max": 0.22,
+          "ram_bytes_peak": 29282533.376000002
+        },
+        "watcher": {
+          "samples": 8,
+          "cpu_percent_median": 0.74,
+          "cpu_percent_max": 0.98,
+          "ram_bytes_peak": 21579694.08
+        },
+        "grafana": {
+          "samples": 8,
+          "cpu_percent_median": 2.455,
+          "cpu_percent_max": 18.28,
+          "ram_bytes_peak": 266548019.2
+        },
+        "postgres": {
+          "samples": 8,
+          "cpu_percent_median": 8.399999999999999,
+          "cpu_percent_max": 15.49,
+          "ram_bytes_peak": 215796940.8
+        },
+        "redis": {
+          "samples": 8,
+          "cpu_percent_median": 0.11,
+          "cpu_percent_max": 1.97,
+          "ram_bytes_peak": 6529482.752
+        },
+        "kafka": {
+          "samples": 8,
+          "cpu_percent_median": 2.405,
+          "cpu_percent_max": 151.03,
+          "ram_bytes_peak": 423519846.4
+        },
+        "prometheus": {
+          "samples": 8,
+          "cpu_percent_median": 0.11,
+          "cpu_percent_max": 1.94,
+          "ram_bytes_peak": 36888903.68
+        },
+        "echo": {
+          "samples": 8,
+          "cpu_percent_median": 0.0,
+          "cpu_percent_max": 0.0,
+          "ram_bytes_peak": 1425014.784
+        }
+      },
+      "resource_sample_errors": 1,
+      "prometheus_peaks": {
+        "pool_saturation": 0.0,
+        "lag": 0.0,
+        "inflight": 0.0
+      },
+      "backlog": [],
+      "git_commit": "afb727e5e5601d184d4b47720586a4fea299da80"
+    },
+    {
+      "run_directory": "20261014T132652Z-cc6b59-durable-herd",
+      "profile": "durable",
+      "scenario": "herd",
+      "repeat": 2,
+      "command": [
+        "make",
+        "bench",
+        "BENCH_PROFILE=durable",
+        "BENCH_SCENARIO=herd",
+        "BENCH_RATE=5000",
+        "BENCH_DURATION=60",
+        "BENCH_WARMUP=0",
+        "BENCH_HERD_JOBS=50000",
+        "BENCH_HERD_LEAD=30",
+        "BENCH_DRAIN_TIMEOUT=300",
+        "BENCH_SCREENSHOTS=0"
+      ],
+      "summary": {
+        "scenario": "herd",
+        "accepted_jobs": 50000,
+        "measurement_accepted_jobs": 50000,
+        "offered_jobs_per_second": null,
+        "window_start": 1791984453.314,
+        "window_end": 1791984461.940886,
+        "window_seconds": 8.626886129379272,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": null,
+          "dispatch_jobs_per_second": 19877.814800723474,
+          "successful_jobs_per_second": 5795.834006632198
+        },
+        "start_latency_seconds": {
+          "max": 8.625456,
+          "p50": 4.5741499999999995,
+          "p95": 8.14562505,
+          "p99": 8.474994090000001,
+          "count": 50000
+        },
+        "drain_seconds": 8.626886129379272,
+        "profile": "durable",
+        "k6_exit_code": 0,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 10.737314278999747,
+        "aborted_for_overload": false,
+        "completed_measurement": true,
+        "execution_counter": null
+      },
+      "raw_audit": {
+        "accepted_jobs": 50000,
+        "measurement_accepted_jobs": 50000,
+        "rejected_batches": 0,
+        "fresh_201_batches": 500,
+        "http_req_failed": 0
+      },
+      "reconciliation": {
+        "jobs": 50000,
+        "runs": 50000,
+        "jobs_with_runs": 50000,
+        "attempt_rows": 50000,
+        "statuses": {
+          "SUCCEEDED": 50000
+        },
+        "invalid_runs": 0,
+        "invalid_attempts": 0,
+        "last_queued": 1791984455.829367,
+        "last_finished": 1791984461.940886,
+        "due_min": 1791984453.314,
+        "due_max": 1791984453.314,
+        "dispatches_in_window": 0,
+        "successes_in_window": 0
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "1024",
+        "shared_buffers": "16384",
+        "max_connections": "100",
+        "autovacuum_naptime": "60",
+        "synchronous_commit": "on",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "resources": {
+        "watcher": {
+          "samples": 1,
+          "cpu_percent_median": 17.87,
+          "cpu_percent_max": 17.87,
+          "ram_bytes_peak": 24148705.28
+        },
+        "executor": {
+          "samples": 1,
+          "cpu_percent_median": 177.18,
+          "cpu_percent_max": 177.18,
+          "ram_bytes_peak": 42519756.8
+        },
+        "api": {
+          "samples": 1,
+          "cpu_percent_median": 0.52,
+          "cpu_percent_max": 0.52,
+          "ram_bytes_peak": 14271119.36
+        },
+        "grafana": {
+          "samples": 1,
+          "cpu_percent_median": 1.19,
+          "cpu_percent_max": 1.19,
+          "ram_bytes_peak": 256691404.8
+        },
+        "postgres": {
+          "samples": 1,
+          "cpu_percent_median": 223.06,
+          "cpu_percent_max": 223.06,
+          "ram_bytes_peak": 181403648.0
+        },
+        "redis": {
+          "samples": 1,
+          "cpu_percent_median": 2.2,
+          "cpu_percent_max": 2.2,
+          "ram_bytes_peak": 6005194.752
+        },
+        "kafka": {
+          "samples": 1,
+          "cpu_percent_median": 123.6,
+          "cpu_percent_max": 123.6,
+          "ram_bytes_peak": 440297062.4
+        },
+        "prometheus": {
+          "samples": 1,
+          "cpu_percent_median": 2.78,
+          "cpu_percent_max": 2.78,
+          "ram_bytes_peak": 33093058.56
+        },
+        "echo": {
+          "samples": 1,
+          "cpu_percent_median": 0.0,
+          "cpu_percent_max": 0.0,
+          "ram_bytes_peak": 1360003.072
+        }
+      },
+      "resource_sample_errors": 0,
+      "prometheus_peaks": {
+        "pool_saturation": 0.4166666666666667,
+        "lag": 28964.0,
+        "inflight": 0.0
+      },
+      "backlog": [],
+      "git_commit": "afb727e5e5601d184d4b47720586a4fea299da80"
+    },
+    {
+      "run_directory": "20261014T132852Z-7fd770-bench-herd",
+      "profile": "bench",
+      "scenario": "herd",
+      "repeat": 2,
+      "command": [
+        "make",
+        "bench",
+        "BENCH_PROFILE=bench",
+        "BENCH_SCENARIO=herd",
+        "BENCH_RATE=5000",
+        "BENCH_DURATION=60",
+        "BENCH_WARMUP=0",
+        "BENCH_HERD_JOBS=50000",
+        "BENCH_HERD_LEAD=30",
+        "BENCH_DRAIN_TIMEOUT=300",
+        "BENCH_SCREENSHOTS=0"
+      ],
+      "summary": {
+        "scenario": "herd",
+        "accepted_jobs": 50000,
+        "measurement_accepted_jobs": 50000,
+        "offered_jobs_per_second": null,
+        "window_start": 1791984572.949,
+        "window_end": 1791984578.587168,
+        "window_seconds": 5.638168096542358,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": null,
+          "dispatch_jobs_per_second": 16370.571015963467,
+          "successful_jobs_per_second": 8868.128644596958
+        },
+        "start_latency_seconds": {
+          "max": 5.637782,
+          "p50": 3.534916,
+          "p95": 5.43986005,
+          "p99": 5.58549904,
+          "count": 50000
+        },
+        "drain_seconds": 5.638168096542358,
+        "profile": "bench",
+        "k6_exit_code": 0,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 5.63362574499979,
+        "aborted_for_overload": false,
+        "completed_measurement": true,
+        "execution_counter": null
+      },
+      "raw_audit": {
+        "accepted_jobs": 50000,
+        "measurement_accepted_jobs": 50000,
+        "rejected_batches": 0,
+        "fresh_201_batches": 500,
+        "http_req_failed": 0
+      },
+      "reconciliation": {
+        "jobs": 50000,
+        "runs": 50000,
+        "jobs_with_runs": 50000,
+        "attempt_rows": 50000,
+        "statuses": {
+          "SUCCEEDED": 50000
+        },
+        "invalid_runs": 0,
+        "invalid_attempts": 0,
+        "last_queued": 1791984576.003261,
+        "last_finished": 1791984578.587168,
+        "due_min": 1791984572.949,
+        "due_max": 1791984572.949,
+        "dispatches_in_window": 0,
+        "successes_in_window": 0
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "4096",
+        "shared_buffers": "65536",
+        "max_connections": "100",
+        "autovacuum_naptime": "60",
+        "synchronous_commit": "off",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "resources": {
+        "executor": {
+          "samples": 1,
+          "cpu_percent_median": 274.83,
+          "cpu_percent_max": 274.83,
+          "ram_bytes_peak": 41366323.2
+        },
+        "api": {
+          "samples": 1,
+          "cpu_percent_median": 0.3,
+          "cpu_percent_max": 0.3,
+          "ram_bytes_peak": 15015608.32
+        },
+        "watcher": {
+          "samples": 1,
+          "cpu_percent_median": 0.64,
+          "cpu_percent_max": 0.64,
+          "ram_bytes_peak": 22942842.880000003
+        },
+        "grafana": {
+          "samples": 1,
+          "cpu_percent_median": 2.24,
+          "cpu_percent_max": 2.24,
+          "ram_bytes_peak": 257635123.2
+        },
+        "postgres": {
+          "samples": 1,
+          "cpu_percent_median": 349.1,
+          "cpu_percent_max": 349.1,
+          "ram_bytes_peak": 209400627.2
+        },
+        "redis": {
+          "samples": 1,
+          "cpu_percent_median": 2.39,
+          "cpu_percent_max": 2.39,
+          "ram_bytes_peak": 6263144.448
+        },
+        "kafka": {
+          "samples": 1,
+          "cpu_percent_median": 309.11,
+          "cpu_percent_max": 309.11,
+          "ram_bytes_peak": 465253171.2
+        },
+        "prometheus": {
+          "samples": 1,
+          "cpu_percent_median": 2.18,
+          "cpu_percent_max": 2.18,
+          "ram_bytes_peak": 37434163.2
+        },
+        "echo": {
+          "samples": 1,
+          "cpu_percent_median": 0.0,
+          "cpu_percent_max": 0.0,
+          "ram_bytes_peak": 1429209.088
+        }
+      },
+      "resource_sample_errors": 0,
+      "prometheus_peaks": {
+        "pool_saturation": 0.3333333333333333,
+        "lag": 22524.0,
+        "inflight": 1.0
+      },
+      "backlog": [],
+      "git_commit": "afb727e5e5601d184d4b47720586a4fea299da80"
+    },
+    {
+      "run_directory": "20261014T133047Z-495874-durable-ingest",
+      "profile": "durable",
+      "scenario": "ingest",
+      "repeat": 3,
+      "command": [
+        "make",
+        "bench",
+        "BENCH_PROFILE=durable",
+        "BENCH_SCENARIO=ingest",
+        "BENCH_RATE=5000",
+        "BENCH_DURATION=60",
+        "BENCH_WARMUP=0",
+        "BENCH_HERD_JOBS=50000",
+        "BENCH_HERD_LEAD=30",
+        "BENCH_DRAIN_TIMEOUT=300",
+        "BENCH_SCREENSHOTS=0"
+      ],
+      "summary": {
+        "scenario": "ingest",
+        "accepted_jobs": 300100,
+        "measurement_accepted_jobs": 300100,
+        "offered_jobs_per_second": 5000,
+        "window_start": 1791984658.072,
+        "window_end": 1791984718.077,
+        "window_seconds": 60.00499987602234,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": 5001.249906175207,
+          "dispatch_jobs_per_second": null,
+          "successful_jobs_per_second": null
+        },
+        "start_latency_seconds": {
+          "max": null,
+          "p50": null,
+          "p95": null,
+          "p99": null,
+          "count": 0
+        },
+        "drain_seconds": 0,
+        "profile": "durable",
+        "k6_exit_code": 0,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 0.625298844000099,
+        "aborted_for_overload": false,
+        "completed_measurement": true,
+        "execution_counter": {
+          "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+          "window_start": 1791984662.752,
+          "window_end": 1791984717.752,
+          "window_seconds": 55.0,
+          "samples": 12,
+          "successful_executions": 0.0,
+          "successful_jobs_per_second": 0.0
+        }
+      },
+      "raw_audit": {
+        "accepted_jobs": 300100,
+        "measurement_accepted_jobs": 300100,
+        "rejected_batches": 0,
+        "fresh_201_batches": 3001,
+        "http_req_failed": 0
+      },
+      "reconciliation": {
+        "jobs": 300100,
+        "runs": 300100,
+        "jobs_with_runs": 300100,
+        "attempt_rows": 0,
+        "statuses": {
+          "PENDING": 300100
+        },
+        "invalid_runs": 0,
+        "invalid_attempts": 0,
+        "last_queued": null,
+        "last_finished": null,
+        "due_min": 1791985048.072,
+        "due_max": 1791985048.072,
+        "dispatches_in_window": 0,
+        "successes_in_window": 0
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "1024",
+        "shared_buffers": "16384",
+        "max_connections": "100",
+        "autovacuum_naptime": "60",
+        "synchronous_commit": "on",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "resources": {
+        "generator": {
+          "samples": 8,
+          "cpu_percent_median": 9.91,
+          "cpu_percent_max": 10.58,
+          "ram_bytes_peak": 51401195.52
+        },
+        "executor": {
+          "samples": 8,
+          "cpu_percent_median": 0.085,
+          "cpu_percent_max": 0.25,
+          "ram_bytes_peak": 30608982.016000003
+        },
+        "api": {
+          "samples": 8,
+          "cpu_percent_median": 10.74,
+          "cpu_percent_max": 11.39,
+          "ram_bytes_peak": 16745758.72
+        },
+        "watcher": {
+          "samples": 8,
+          "cpu_percent_median": 0.7050000000000001,
+          "cpu_percent_max": 0.85,
+          "ram_bytes_peak": 21873295.36
+        },
+        "grafana": {
+          "samples": 8,
+          "cpu_percent_median": 2.215,
+          "cpu_percent_max": 20.42,
+          "ram_bytes_peak": 266548019.2
+        },
+        "postgres": {
+          "samples": 8,
+          "cpu_percent_median": 8.51,
+          "cpu_percent_max": 15.67,
+          "ram_bytes_peak": 194196275.2
+        },
+        "redis": {
+          "samples": 8,
+          "cpu_percent_median": 0.1,
+          "cpu_percent_max": 1.92,
+          "ram_bytes_peak": 6532628.48
+        },
+        "kafka": {
+          "samples": 8,
+          "cpu_percent_median": 3.205,
+          "cpu_percent_max": 127.19,
+          "ram_bytes_peak": 418067251.2
+        },
+        "prometheus": {
+          "samples": 8,
+          "cpu_percent_median": 0.13,
+          "cpu_percent_max": 1.91,
+          "ram_bytes_peak": 39311114.24
+        },
+        "echo": {
+          "samples": 8,
+          "cpu_percent_median": 0.0,
+          "cpu_percent_max": 0.0,
+          "ram_bytes_peak": 1425014.784
+        }
+      },
+      "resource_sample_errors": 1,
+      "prometheus_peaks": {
+        "pool_saturation": 0.0,
+        "lag": 0.0,
+        "inflight": 0.0
+      },
+      "backlog": [],
+      "git_commit": "afb727e5e5601d184d4b47720586a4fea299da80"
+    },
+    {
+      "run_directory": "20261014T133306Z-e635b9-bench-ingest",
+      "profile": "bench",
+      "scenario": "ingest",
+      "repeat": 3,
+      "command": [
+        "make",
+        "bench",
+        "BENCH_PROFILE=bench",
+        "BENCH_SCENARIO=ingest",
+        "BENCH_RATE=5000",
+        "BENCH_DURATION=60",
+        "BENCH_WARMUP=0",
+        "BENCH_HERD_JOBS=50000",
+        "BENCH_HERD_LEAD=30",
+        "BENCH_DRAIN_TIMEOUT=300",
+        "BENCH_SCREENSHOTS=0"
+      ],
+      "summary": {
+        "scenario": "ingest",
+        "accepted_jobs": 300000,
+        "measurement_accepted_jobs": 300000,
+        "offered_jobs_per_second": 5000,
+        "window_start": 1791984797.128,
+        "window_end": 1791984857.128,
+        "window_seconds": 60.0,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": 5000.0,
+          "dispatch_jobs_per_second": null,
+          "successful_jobs_per_second": null
+        },
+        "start_latency_seconds": {
+          "max": null,
+          "p50": null,
+          "p95": null,
+          "p99": null,
+          "count": 0
+        },
+        "drain_seconds": 0,
+        "profile": "bench",
+        "k6_exit_code": 0,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 0.6497168959999726,
+        "aborted_for_overload": false,
+        "completed_measurement": true,
+        "execution_counter": {
+          "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+          "window_start": 1791984801.833,
+          "window_end": 1791984856.833,
+          "window_seconds": 55.0,
+          "samples": 12,
+          "successful_executions": 0.0,
+          "successful_jobs_per_second": 0.0
+        }
+      },
+      "raw_audit": {
+        "accepted_jobs": 300000,
+        "measurement_accepted_jobs": 300000,
+        "rejected_batches": 0,
+        "fresh_201_batches": 3000,
+        "http_req_failed": 0
+      },
+      "reconciliation": {
+        "jobs": 300000,
+        "runs": 300000,
+        "jobs_with_runs": 300000,
+        "attempt_rows": 0,
+        "statuses": {
+          "PENDING": 300000
+        },
+        "invalid_runs": 0,
+        "invalid_attempts": 0,
+        "last_queued": null,
+        "last_finished": null,
+        "due_min": 1791985187.128,
+        "due_max": 1791985187.128,
+        "dispatches_in_window": 0,
+        "successes_in_window": 0
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "4096",
+        "shared_buffers": "65536",
+        "max_connections": "100",
+        "autovacuum_naptime": "60",
+        "synchronous_commit": "off",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "resources": {
+        "generator": {
+          "samples": 8,
+          "cpu_percent_median": 9.510000000000002,
+          "cpu_percent_max": 10.73,
+          "ram_bytes_peak": 51380224.0
+        },
+        "executor": {
+          "samples": 8,
+          "cpu_percent_median": 0.11000000000000001,
+          "cpu_percent_max": 0.29,
+          "ram_bytes_peak": 32033996.799999997
+        },
+        "watcher": {
+          "samples": 8,
+          "cpu_percent_median": 0.5800000000000001,
+          "cpu_percent_max": 0.98,
+          "ram_bytes_peak": 22217228.288
+        },
+        "api": {
+          "samples": 8,
+          "cpu_percent_median": 10.54,
+          "cpu_percent_max": 11.48,
+          "ram_bytes_peak": 16200499.2
+        },
+        "grafana": {
+          "samples": 8,
+          "cpu_percent_median": 2.48,
+          "cpu_percent_max": 4.22,
+          "ram_bytes_peak": 258998272.0
+        },
+        "redis": {
+          "samples": 8,
+          "cpu_percent_median": 0.11,
+          "cpu_percent_max": 1.86,
+          "ram_bytes_peak": 6586105.856
+        },
+        "postgres": {
+          "samples": 8,
+          "cpu_percent_median": 8.005,
+          "cpu_percent_max": 15.05,
+          "ram_bytes_peak": 218732953.6
+        },
+        "kafka": {
+          "samples": 8,
+          "cpu_percent_median": 2.295,
+          "cpu_percent_max": 145.8,
+          "ram_bytes_peak": 420583833.6
+        },
+        "prometheus": {
+          "samples": 8,
+          "cpu_percent_median": 0.11,
+          "cpu_percent_max": 1.82,
+          "ram_bytes_peak": 39887831.04
+        },
+        "echo": {
+          "samples": 8,
+          "cpu_percent_median": 0.0,
+          "cpu_percent_max": 0.0,
+          "ram_bytes_peak": 1355808.768
+        }
+      },
+      "resource_sample_errors": 1,
+      "prometheus_peaks": {
+        "pool_saturation": 0.08333333333333333,
+        "lag": 0.0,
+        "inflight": 0.0
+      },
+      "backlog": [],
+      "git_commit": "afb727e5e5601d184d4b47720586a4fea299da80"
+    },
+    {
+      "run_directory": "20261014T133525Z-dc2e7b-durable-herd",
+      "profile": "durable",
+      "scenario": "herd",
+      "repeat": 3,
+      "command": [
+        "make",
+        "bench",
+        "BENCH_PROFILE=durable",
+        "BENCH_SCENARIO=herd",
+        "BENCH_RATE=5000",
+        "BENCH_DURATION=60",
+        "BENCH_WARMUP=0",
+        "BENCH_HERD_JOBS=50000",
+        "BENCH_HERD_LEAD=30",
+        "BENCH_DRAIN_TIMEOUT=300",
+        "BENCH_SCREENSHOTS=0"
+      ],
+      "summary": {
+        "scenario": "herd",
+        "accepted_jobs": 50000,
+        "measurement_accepted_jobs": 50000,
+        "offered_jobs_per_second": null,
+        "window_start": 1791984966.338,
+        "window_end": 1791984975.474296,
+        "window_seconds": 9.136296033859253,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": null,
+          "dispatch_jobs_per_second": 19780.21128110925,
+          "successful_jobs_per_second": 5472.677309787165
+        },
+        "start_latency_seconds": {
+          "max": 9.134847,
+          "p50": 4.809081,
+          "p95": 8.635561999999998,
+          "p99": 8.98414546,
+          "count": 50000
+        },
+        "drain_seconds": 9.136296033859253,
+        "profile": "durable",
+        "k6_exit_code": 0,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 10.713957362999736,
+        "aborted_for_overload": false,
+        "completed_measurement": true,
+        "execution_counter": null
+      },
+      "raw_audit": {
+        "accepted_jobs": 50000,
+        "measurement_accepted_jobs": 50000,
+        "rejected_batches": 0,
+        "fresh_201_batches": 500,
+        "http_req_failed": 0
+      },
+      "reconciliation": {
+        "jobs": 50000,
+        "runs": 50000,
+        "jobs_with_runs": 50000,
+        "attempt_rows": 50000,
+        "statuses": {
+          "SUCCEEDED": 50000
+        },
+        "invalid_runs": 0,
+        "invalid_attempts": 0,
+        "last_queued": 1791984968.865779,
+        "last_finished": 1791984975.474296,
+        "due_min": 1791984966.338,
+        "due_max": 1791984966.338,
+        "dispatches_in_window": 0,
+        "successes_in_window": 0
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "1024",
+        "shared_buffers": "16384",
+        "max_connections": "100",
+        "autovacuum_naptime": "60",
+        "synchronous_commit": "on",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "resources": {
+        "watcher": {
+          "samples": 1,
+          "cpu_percent_median": 0.5700000000000001,
+          "cpu_percent_max": 0.5700000000000001,
+          "ram_bytes_peak": 24589107.200000003
+        },
+        "executor": {
+          "samples": 1,
+          "cpu_percent_median": 163.88,
+          "cpu_percent_max": 163.88,
+          "ram_bytes_peak": 41722839.04
+        },
+        "api": {
+          "samples": 1,
+          "cpu_percent_median": 0.01,
+          "cpu_percent_max": 0.01,
+          "ram_bytes_peak": 13851688.96
+        },
+        "grafana": {
+          "samples": 1,
+          "cpu_percent_median": 3.87,
+          "cpu_percent_max": 3.87,
+          "ram_bytes_peak": 244318208.0
+        },
+        "redis": {
+          "samples": 1,
+          "cpu_percent_median": 2.28,
+          "cpu_percent_max": 2.28,
+          "ram_bytes_peak": 6005194.752
+        },
+        "postgres": {
+          "samples": 1,
+          "cpu_percent_median": 206.09,
+          "cpu_percent_max": 206.09,
+          "ram_bytes_peak": 185283379.2
+        },
+        "kafka": {
+          "samples": 1,
+          "cpu_percent_median": 88.45,
+          "cpu_percent_max": 88.45,
+          "ram_bytes_peak": 437570764.8
+        },
+        "prometheus": {
+          "samples": 1,
+          "cpu_percent_median": 2.12,
+          "cpu_percent_max": 2.12,
+          "ram_bytes_peak": 40254832.64
+        },
+        "echo": {
+          "samples": 1,
+          "cpu_percent_median": 0.0,
+          "cpu_percent_max": 0.0,
+          "ram_bytes_peak": 1413480.448
+        }
+      },
+      "resource_sample_errors": 0,
+      "prometheus_peaks": {
+        "pool_saturation": 0.5833333333333334,
+        "lag": 2922.0,
+        "inflight": 0.0
+      },
+      "backlog": [],
+      "git_commit": "afb727e5e5601d184d4b47720586a4fea299da80"
+    },
+    {
+      "run_directory": "20261014T133724Z-228a23-bench-herd",
+      "profile": "bench",
+      "scenario": "herd",
+      "repeat": 3,
+      "command": [
+        "make",
+        "bench",
+        "BENCH_PROFILE=bench",
+        "BENCH_SCENARIO=herd",
+        "BENCH_RATE=5000",
+        "BENCH_DURATION=60",
+        "BENCH_WARMUP=0",
+        "BENCH_HERD_JOBS=50000",
+        "BENCH_HERD_LEAD=30",
+        "BENCH_DRAIN_TIMEOUT=300",
+        "BENCH_SCREENSHOTS=0"
+      ],
+      "summary": {
+        "scenario": "herd",
+        "accepted_jobs": 50000,
+        "measurement_accepted_jobs": 50000,
+        "offered_jobs_per_second": null,
+        "window_start": 1791985084.655,
+        "window_end": 1791985090.251139,
+        "window_seconds": 5.596138954162598,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": null,
+          "dispatch_jobs_per_second": 17191.181014114354,
+          "successful_jobs_per_second": 8934.731680100314
+        },
+        "start_latency_seconds": {
+          "max": 5.595754,
+          "p50": 3.3794185,
+          "p95": 5.3858137500000005,
+          "p99": 5.53574913,
+          "count": 50000
+        },
+        "drain_seconds": 5.596138954162598,
+        "profile": "bench",
+        "k6_exit_code": 0,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 5.6367912499999875,
+        "aborted_for_overload": false,
+        "completed_measurement": true,
+        "execution_counter": null
+      },
+      "raw_audit": {
+        "accepted_jobs": 50000,
+        "measurement_accepted_jobs": 50000,
+        "rejected_batches": 0,
+        "fresh_201_batches": 500,
+        "http_req_failed": 0
+      },
+      "reconciliation": {
+        "jobs": 50000,
+        "runs": 50000,
+        "jobs_with_runs": 50000,
+        "attempt_rows": 50000,
+        "statuses": {
+          "SUCCEEDED": 50000
+        },
+        "invalid_runs": 0,
+        "invalid_attempts": 0,
+        "last_queued": 1791985087.563468,
+        "last_finished": 1791985090.251139,
+        "due_min": 1791985084.655,
+        "due_max": 1791985084.655,
+        "dispatches_in_window": 0,
+        "successes_in_window": 0
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "4096",
+        "shared_buffers": "65536",
+        "max_connections": "100",
+        "autovacuum_naptime": "60",
+        "synchronous_commit": "off",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "resources": {
+        "api": {
+          "samples": 1,
+          "cpu_percent_median": 0.3,
+          "cpu_percent_max": 0.3,
+          "ram_bytes_peak": 13180600.32
+        },
+        "watcher": {
+          "samples": 1,
+          "cpu_percent_median": 0.67,
+          "cpu_percent_max": 0.67,
+          "ram_bytes_peak": 23551016.96
+        },
+        "executor": {
+          "samples": 1,
+          "cpu_percent_median": 295.43,
+          "cpu_percent_max": 295.43,
+          "ram_bytes_peak": 41429237.76
+        },
+        "grafana": {
+          "samples": 1,
+          "cpu_percent_median": 10.93,
+          "cpu_percent_max": 10.93,
+          "ram_bytes_peak": 259522560.0
+        },
+        "redis": {
+          "samples": 1,
+          "cpu_percent_median": 2.45,
+          "cpu_percent_max": 2.45,
+          "ram_bytes_peak": 6278873.088
+        },
+        "postgres": {
+          "samples": 1,
+          "cpu_percent_median": 368.71,
+          "cpu_percent_max": 368.71,
+          "ram_bytes_peak": 212336640.0
+        },
+        "kafka": {
+          "samples": 1,
+          "cpu_percent_median": 291.8,
+          "cpu_percent_max": 291.8,
+          "ram_bytes_peak": 465148313.6
+        },
+        "prometheus": {
+          "samples": 1,
+          "cpu_percent_median": 2.37,
+          "cpu_percent_max": 2.37,
+          "ram_bytes_peak": 32296140.8
+        },
+        "echo": {
+          "samples": 1,
+          "cpu_percent_median": 0.0,
+          "cpu_percent_max": 0.0,
+          "ram_bytes_peak": 1433403.392
+        }
+      },
+      "resource_sample_errors": 0,
+      "prometheus_peaks": {
+        "pool_saturation": 0.5,
+        "lag": 24724.0,
+        "inflight": 0.0
+      },
+      "backlog": [],
+      "git_commit": "afb727e5e5601d184d4b47720586a4fea299da80"
+    },
+    {
+      "run_directory": "20261014T134256Z-e33917-durable-soak",
+      "profile": "durable",
+      "scenario": "soak",
+      "repeat": null,
+      "command": [
+        "make",
+        "bench",
+        "BENCH_PROFILE=durable",
+        "BENCH_SCENARIO=soak",
+        "BENCH_RATE=5000",
+        "BENCH_DURATION=600",
+        "BENCH_WARMUP=30",
+        "BENCH_HERD_JOBS=50000",
+        "BENCH_HERD_LEAD=30",
+        "BENCH_DRAIN_TIMEOUT=300",
+        "BENCH_SCREENSHOTS=1"
+      ],
+      "summary": {
+        "scenario": "soak",
+        "accepted_jobs": 1534500,
+        "measurement_accepted_jobs": 1384400,
+        "offered_jobs_per_second": 5000,
+        "window_start": 1791985417.486,
+        "window_end": 1791985694.354,
+        "window_seconds": 276.8680000305176,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": 5000.2167092166865,
+          "dispatch_jobs_per_second": 5000.119189821173,
+          "successful_jobs_per_second": 4201.565366426523
+        },
+        "start_latency_seconds": {
+          "max": 112.938323,
+          "p50": 0.170113,
+          "p95": 91.05622755000003,
+          "p99": 108.10744434,
+          "count": 1384400
+        },
+        "drain_seconds": 112.83210301399231,
+        "profile": "durable",
+        "k6_exit_code": 105,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 103.27558785100018,
+        "aborted_for_overload": true,
+        "completed_measurement": false,
+        "execution_counter": {
+          "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+          "window_start": 1791985421.91,
+          "window_end": 1791985691.91,
+          "window_seconds": 270.0,
+          "samples": 55,
+          "successful_executions": 1144211.0,
+          "successful_jobs_per_second": 4237.818518518518
+        }
+      },
+      "raw_audit": {
+        "accepted_jobs": 1534500,
+        "measurement_accepted_jobs": 1384400,
+        "rejected_batches": 0,
+        "http_req_failed": 0,
+        "fresh_201_batches": 15345
+      },
+      "reconciliation": {
+        "jobs": 1534500,
+        "runs": 1534500,
+        "jobs_with_runs": 1534500,
+        "attempt_rows": 1534500,
+        "statuses": {
+          "SUCCEEDED": 1534500
+        },
+        "invalid_runs": 0,
+        "invalid_attempts": 0,
+        "last_queued": 1791985694.423361,
+        "last_finished": 1791985807.186103,
+        "due_min": 1791985387.487,
+        "due_max": 1791985694.347,
+        "dispatches_in_window": 1384373,
+        "successes_in_window": 1163279
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "1024",
+        "shared_buffers": "16384",
+        "max_connections": "100",
+        "autovacuum_naptime": "60",
+        "synchronous_commit": "on",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "resources": {
+        "generator": {
+          "samples": 39,
+          "cpu_percent_median": 12.06,
+          "cpu_percent_max": 15.56,
+          "ram_bytes_peak": 105277030.4
+        },
+        "executor": {
+          "samples": 39,
+          "cpu_percent_median": 138.97,
+          "cpu_percent_max": 149.78,
+          "ram_bytes_peak": 60072919.04
+        },
+        "api": {
+          "samples": 39,
+          "cpu_percent_median": 11.63,
+          "cpu_percent_max": 12.77,
+          "ram_bytes_peak": 46347059.2
+        },
+        "watcher": {
+          "samples": 39,
+          "cpu_percent_median": 17.57,
+          "cpu_percent_max": 20.25,
+          "ram_bytes_peak": 45392855.04
+        },
+        "grafana": {
+          "samples": 39,
+          "cpu_percent_median": 1.13,
+          "cpu_percent_max": 20.92,
+          "ram_bytes_peak": 460954009.6
+        },
+        "postgres": {
+          "samples": 39,
+          "cpu_percent_median": 207.93,
+          "cpu_percent_max": 251.38,
+          "ram_bytes_peak": 410412646.4
+        },
+        "redis": {
+          "samples": 39,
+          "cpu_percent_median": 0.12,
+          "cpu_percent_max": 2.4,
+          "ram_bytes_peak": 12289310.72
+        },
+        "kafka": {
+          "samples": 39,
+          "cpu_percent_median": 13.5,
+          "cpu_percent_max": 179.79,
+          "ram_bytes_peak": 1141387558.912
+        },
+        "prometheus": {
+          "samples": 39,
+          "cpu_percent_median": 0.18,
+          "cpu_percent_max": 2.29,
+          "ram_bytes_peak": 96783564.8
+        },
+        "echo": {
+          "samples": 39,
+          "cpu_percent_median": 0.0,
+          "cpu_percent_max": 0.0,
+          "ram_bytes_peak": 5070913.536
+        }
+      },
+      "resource_sample_errors": 1,
+      "prometheus_peaks": {
+        "pool_saturation": 0.8333333333333334,
+        "lag": 209501.0,
+        "inflight": 0.0
+      },
+      "backlog": [
+        {
+          "time": 1791985417.5250576,
+          "source": "postgres",
+          "backlog": 905.3333333333334,
+          "samples": 6,
+          "minimum": 771,
+          "maximum": 1132
+        },
+        {
+          "time": 1791985448.2281864,
+          "source": "postgres",
+          "backlog": 835.6666666666666,
+          "samples": 6,
+          "minimum": 759,
+          "maximum": 884
+        },
+        {
+          "time": 1791985478.9677594,
+          "source": "postgres",
+          "backlog": 812.3333333333334,
+          "samples": 6,
+          "minimum": 701,
+          "maximum": 974
+        },
+        {
+          "time": 1791985509.6872413,
+          "source": "postgres",
+          "backlog": 807.6666666666666,
+          "samples": 6,
+          "minimum": 745,
+          "maximum": 918
+        },
+        {
+          "time": 1791985540.4257703,
+          "source": "postgres",
+          "backlog": 804.8333333333334,
+          "samples": 6,
+          "minimum": 688,
+          "maximum": 896
+        },
+        {
+          "time": 1791985571.139559,
+          "source": "postgres",
+          "backlog": 764.0,
+          "samples": 6,
+          "minimum": 641,
+          "maximum": 858
+        },
+        {
+          "time": 1791985601.8359497,
+          "source": "postgres",
+          "backlog": 796.6666666666666,
+          "samples": 6,
+          "minimum": 724,
+          "maximum": 894
+        },
+        {
+          "time": 1791985632.5302045,
+          "source": "postgres",
+          "backlog": 14405.333333333334,
+          "samples": 6,
+          "minimum": 766,
+          "maximum": 42287
+        },
+        {
+          "time": 1791985663.4204316,
+          "source": "postgres",
+          "backlog": 94270.66666666667,
+          "samples": 6,
+          "minimum": 56218,
+          "maximum": 131914
+        },
+        {
+          "time": 1791985694.2496495,
+          "source": "postgres",
+          "backlog": 184619.16666666666,
+          "samples": 6,
+          "minimum": 147987,
+          "maximum": 221484
+        }
+      ],
+      "git_commit": "afb727e5e5601d184d4b47720586a4fea299da80"
+    },
+    {
+      "run_directory": "20261014T135120Z-ada6ab-durable-soak",
+      "profile": "durable",
+      "scenario": "soak",
+      "repeat": null,
+      "command": [
+        "make",
+        "bench",
+        "BENCH_PROFILE=durable",
+        "BENCH_SCENARIO=soak",
+        "BENCH_RATE=1000",
+        "BENCH_DURATION=600",
+        "BENCH_WARMUP=30",
+        "BENCH_HERD_JOBS=50000",
+        "BENCH_HERD_LEAD=30",
+        "BENCH_DRAIN_TIMEOUT=300",
+        "BENCH_SCREENSHOTS=1"
+      ],
+      "summary": {
+        "scenario": "soak",
+        "accepted_jobs": 630100,
+        "measurement_accepted_jobs": 600100,
+        "offered_jobs_per_second": 1000,
+        "window_start": 1791985920.591,
+        "window_end": 1791986520.599,
+        "window_seconds": 600.0079998970032,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": 1000.1533314606015,
+          "dispatch_jobs_per_second": 999.9866670160989,
+          "successful_jobs_per_second": 999.9866670160989
+        },
+        "start_latency_seconds": {
+          "max": 0.573736,
+          "p50": 0.138508,
+          "p95": 0.21703404999999992,
+          "p99": 0.24206402000000002,
+          "count": 600100
+        },
+        "drain_seconds": 0.15754008293151855,
+        "profile": "durable",
+        "k6_exit_code": 0,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 2.7121399360003124,
+        "aborted_for_overload": false,
+        "completed_measurement": true,
+        "execution_counter": {
+          "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+          "window_start": 1791985925.131,
+          "window_end": 1791986520.131,
+          "window_seconds": 595.0,
+          "samples": 120,
+          "successful_executions": 594927.0,
+          "successful_jobs_per_second": 999.8773109243698
+        }
+      },
+      "raw_audit": {
+        "accepted_jobs": 630100,
+        "measurement_accepted_jobs": 600100,
+        "rejected_batches": 0,
+        "http_req_failed": 0,
+        "fresh_201_batches": 6301
+      },
+      "reconciliation": {
+        "jobs": 630100,
+        "runs": 630100,
+        "jobs_with_runs": 630100,
+        "attempt_rows": 630100,
+        "statuses": {
+          "SUCCEEDED": 630100
+        },
+        "invalid_runs": 0,
+        "invalid_attempts": 0,
+        "last_queued": 1791986520.628665,
+        "last_finished": 1791986520.75654,
+        "due_min": 1791985890.592,
+        "due_max": 1791986520.592,
+        "dispatches_in_window": 600000,
+        "successes_in_window": 600000
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "1024",
+        "shared_buffers": "16384",
+        "max_connections": "100",
+        "autovacuum_naptime": "60",
+        "synchronous_commit": "on",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "resources": {
+        "generator": {
+          "samples": 85,
+          "cpu_percent_median": 1.94,
+          "cpu_percent_max": 6.17,
+          "ram_bytes_peak": 101019811.84
+        },
+        "watcher": {
+          "samples": 85,
+          "cpu_percent_median": 4.26,
+          "cpu_percent_max": 5.010000000000001,
+          "ram_bytes_peak": 27315404.8
+        },
+        "executor": {
+          "samples": 85,
+          "cpu_percent_median": 31.42,
+          "cpu_percent_max": 36.93000000000001,
+          "ram_bytes_peak": 45686456.32
+        },
+        "api": {
+          "samples": 85,
+          "cpu_percent_median": 2.44,
+          "cpu_percent_max": 3.14,
+          "ram_bytes_peak": 20919091.2
+        },
+        "grafana": {
+          "samples": 85,
+          "cpu_percent_median": 0.45,
+          "cpu_percent_max": 23.54,
+          "ram_bytes_peak": 309329920.0
+        },
+        "redis": {
+          "samples": 85,
+          "cpu_percent_median": 0.11,
+          "cpu_percent_max": 2.38,
+          "ram_bytes_peak": 10957619.2
+        },
+        "postgres": {
+          "samples": 85,
+          "cpu_percent_median": 48.52,
+          "cpu_percent_max": 78.81,
+          "ram_bytes_peak": 342360064.0
+        },
+        "kafka": {
+          "samples": 85,
+          "cpu_percent_median": 5.19,
+          "cpu_percent_max": 165.37,
+          "ram_bytes_peak": 1058013184.0
+        },
+        "prometheus": {
+          "samples": 85,
+          "cpu_percent_median": 0.15,
+          "cpu_percent_max": 2.5,
+          "ram_bytes_peak": 39374028.8
+        },
+        "echo": {
+          "samples": 85,
+          "cpu_percent_median": 0.0,
+          "cpu_percent_max": 0.0,
+          "ram_bytes_peak": 1420820.48
+        }
+      },
+      "resource_sample_errors": 0,
+      "prometheus_peaks": {
+        "pool_saturation": 0.75,
+        "lag": 200.0,
+        "inflight": 0.0
+      },
+      "backlog": [
+        {
+          "time": 1791985920.6640434,
+          "source": "postgres",
+          "backlog": 101.33333333333333,
+          "samples": 6,
+          "minimum": 0,
+          "maximum": 200
+        },
+        {
+          "time": 1791985951.2809668,
+          "source": "postgres",
+          "backlog": 116.5,
+          "samples": 6,
+          "minimum": 11,
+          "maximum": 200
+        },
+        {
+          "time": 1791985981.899541,
+          "source": "postgres",
+          "backlog": 107.16666666666667,
+          "samples": 6,
+          "minimum": 0,
+          "maximum": 200
+        },
+        {
+          "time": 1791986012.5135639,
+          "source": "postgres",
+          "backlog": 106.66666666666667,
+          "samples": 6,
+          "minimum": 1,
+          "maximum": 200
+        },
+        {
+          "time": 1791986043.1482017,
+          "source": "postgres",
+          "backlog": 84.66666666666667,
+          "samples": 6,
+          "minimum": 19,
+          "maximum": 100
+        },
+        {
+          "time": 1791986073.7655208,
+          "source": "postgres",
+          "backlog": 136.66666666666666,
+          "samples": 6,
+          "minimum": 100,
+          "maximum": 200
+        },
+        {
+          "time": 1791986104.4111207,
+          "source": "postgres",
+          "backlog": 159.5,
+          "samples": 6,
+          "minimum": 100,
+          "maximum": 200
+        },
+        {
+          "time": 1791986135.0164666,
+          "source": "postgres",
+          "backlog": 147.16666666666666,
+          "samples": 6,
+          "minimum": 100,
+          "maximum": 200
+        },
+        {
+          "time": 1791986165.657936,
+          "source": "postgres",
+          "backlog": 124.66666666666667,
+          "samples": 6,
+          "minimum": 100,
+          "maximum": 190
+        },
+        {
+          "time": 1791986196.2599626,
+          "source": "postgres",
+          "backlog": 139.66666666666666,
+          "samples": 6,
+          "minimum": 100,
+          "maximum": 200
+        },
+        {
+          "time": 1791986226.8936334,
+          "source": "postgres",
+          "backlog": 171.33333333333334,
+          "samples": 6,
+          "minimum": 100,
+          "maximum": 310
+        },
+        {
+          "time": 1791986257.4997973,
+          "source": "postgres",
+          "backlog": 149.16666666666666,
+          "samples": 6,
+          "minimum": 101,
+          "maximum": 200
+        },
+        {
+          "time": 1791986288.1016655,
+          "source": "postgres",
+          "backlog": 133.33333333333334,
+          "samples": 6,
+          "minimum": 98,
+          "maximum": 200
+        },
+        {
+          "time": 1791986318.7056603,
+          "source": "postgres",
+          "backlog": 144.33333333333334,
+          "samples": 6,
+          "minimum": 80,
+          "maximum": 200
+        },
+        {
+          "time": 1791986349.3470676,
+          "source": "postgres",
+          "backlog": 123.0,
+          "samples": 6,
+          "minimum": 100,
+          "maximum": 170
+        },
+        {
+          "time": 1791986379.978015,
+          "source": "postgres",
+          "backlog": 138.0,
+          "samples": 6,
+          "minimum": 100,
+          "maximum": 200
+        },
+        {
+          "time": 1791986410.5921116,
+          "source": "postgres",
+          "backlog": 148.33333333333334,
+          "samples": 6,
+          "minimum": 100,
+          "maximum": 200
+        },
+        {
+          "time": 1791986441.2157705,
+          "source": "postgres",
+          "backlog": 151.5,
+          "samples": 6,
+          "minimum": 100,
+          "maximum": 200
+        },
+        {
+          "time": 1791986471.8344457,
+          "source": "postgres",
+          "backlog": 133.66666666666666,
+          "samples": 6,
+          "minimum": 100,
+          "maximum": 200
+        },
+        {
+          "time": 1791986502.4542224,
+          "source": "postgres",
+          "backlog": 145.16666666666666,
+          "samples": 6,
+          "minimum": 100,
+          "maximum": 200
+        }
+      ],
+      "git_commit": "afb727e5e5601d184d4b47720586a4fea299da80"
+    },
+    {
+      "run_directory": "20261014T140248Z-0bd1f5-bench-soak",
+      "profile": "bench",
+      "scenario": "soak",
+      "repeat": null,
+      "command": [
+        "make",
+        "bench",
+        "BENCH_PROFILE=bench",
+        "BENCH_SCENARIO=soak",
+        "BENCH_RATE=5000",
+        "BENCH_DURATION=600",
+        "BENCH_WARMUP=30",
+        "BENCH_HERD_JOBS=50000",
+        "BENCH_HERD_LEAD=30",
+        "BENCH_DRAIN_TIMEOUT=300",
+        "BENCH_SCREENSHOTS=1"
+      ],
+      "summary": {
+        "scenario": "soak",
+        "accepted_jobs": 3150000,
+        "measurement_accepted_jobs": 3000000,
+        "offered_jobs_per_second": 5000,
+        "window_start": 1791986609.003,
+        "window_end": 1791987209.003,
+        "window_seconds": 600.0,
+        "dropped_iterations": 0,
+        "rejected_batches": 0,
+        "reconciled": true,
+        "errors": [],
+        "load_generation_complete": true,
+        "rates": {
+          "ingest_jobs_per_second": 5000.0,
+          "dispatch_jobs_per_second": 5000.0,
+          "successful_jobs_per_second": 5000.0
+        },
+        "start_latency_seconds": {
+          "max": 0.608245,
+          "p50": 0.110993,
+          "p95": 0.176921,
+          "p99": 0.20294900999999976,
+          "count": 3000000
+        },
+        "drain_seconds": 0.09693598747253418,
+        "profile": "bench",
+        "k6_exit_code": 0,
+        "unfinished_runs": 0,
+        "drain_collection_seconds": 14.756943256999875,
+        "aborted_for_overload": false,
+        "completed_measurement": true,
+        "execution_counter": {
+          "source": "sum(executions_total{job=\"executor\",result=\"succeeded\"})",
+          "window_start": 1791986613.71,
+          "window_end": 1791987208.71,
+          "window_seconds": 595.0,
+          "samples": 120,
+          "successful_executions": 2975018.0,
+          "successful_jobs_per_second": 5000.030252100841
+        }
+      },
+      "raw_audit": {
+        "accepted_jobs": 3150000,
+        "measurement_accepted_jobs": 3000000,
+        "rejected_batches": 0,
+        "http_req_failed": 0,
+        "fresh_201_batches": 31500
+      },
+      "reconciliation": {
+        "jobs": 3150000,
+        "runs": 3150000,
+        "jobs_with_runs": 3150000,
+        "attempt_rows": 3150000,
+        "statuses": {
+          "SUCCEEDED": 3150000
+        },
+        "invalid_runs": 0,
+        "invalid_attempts": 0,
+        "last_queued": 1791987209.036915,
+        "last_finished": 1791987209.083936,
+        "due_min": 1791986579.004,
+        "due_max": 1791987208.984,
+        "dispatches_in_window": 3000000,
+        "successes_in_window": 3000000
+      },
+      "postgres": {
+        "fsync": "on",
+        "max_wal_size": "4096",
+        "shared_buffers": "65536",
+        "max_connections": "100",
+        "autovacuum_naptime": "60",
+        "synchronous_commit": "off",
+        "autovacuum_vacuum_scale_factor": "0.2",
+        "autovacuum_analyze_scale_factor": "0.1"
+      },
+      "resources": {
+        "generator": {
+          "samples": 85,
+          "cpu_percent_median": 11.86,
+          "cpu_percent_max": 16.55,
+          "ram_bytes_peak": 94633984.0
+        },
+        "executor": {
+          "samples": 85,
+          "cpu_percent_median": 137.78,
+          "cpu_percent_max": 151.17,
+          "ram_bytes_peak": 44008734.72
+        },
+        "watcher": {
+          "samples": 85,
+          "cpu_percent_median": 17.009999999999998,
+          "cpu_percent_max": 21.4,
+          "ram_bytes_peak": 29496442.88
+        },
+        "api": {
+          "samples": 85,
+          "cpu_percent_median": 11.9,
+          "cpu_percent_max": 13.92,
+          "ram_bytes_peak": 22764584.96
+        },
+        "grafana": {
+          "samples": 85,
+          "cpu_percent_median": 0.46,
+          "cpu_percent_max": 33.34,
+          "ram_bytes_peak": 530264883.2
+        },
+        "redis": {
+          "samples": 85,
+          "cpu_percent_median": 0.12,
+          "cpu_percent_max": 2.54,
+          "ram_bytes_peak": 12215910.4
+        },
+        "postgres": {
+          "samples": 85,
+          "cpu_percent_median": 201.63,
+          "cpu_percent_max": 277.86,
+          "ram_bytes_peak": 915616563.2
+        },
+        "kafka": {
+          "samples": 85,
+          "cpu_percent_median": 15.15,
+          "cpu_percent_max": 213.9,
+          "ram_bytes_peak": 1081258016.768
+        },
+        "prometheus": {
+          "samples": 85,
+          "cpu_percent_median": 0.17,
+          "cpu_percent_max": 2.63,
+          "ram_bytes_peak": 38451281.92
+        },
+        "echo": {
+          "samples": 85,
+          "cpu_percent_median": 0.0,
+          "cpu_percent_max": 0.0,
+          "ram_bytes_peak": 1441792.0
+        }
+      },
+      "resource_sample_errors": 0,
+      "prometheus_peaks": {
+        "pool_saturation": 0.8333333333333334,
+        "lag": 523.0,
+        "inflight": 2.0
+      },
+      "backlog": [
+        {
+          "time": 1791986609.3242238,
+          "source": "postgres",
+          "backlog": 637.5,
+          "samples": 6,
+          "minimum": 539,
+          "maximum": 700
+        },
+        {
+          "time": 1791986640.0066917,
+          "source": "postgres",
+          "backlog": 569.8333333333334,
+          "samples": 6,
+          "minimum": 508,
+          "maximum": 600
+        },
+        {
+          "time": 1791986670.7161717,
+          "source": "postgres",
+          "backlog": 778.6666666666666,
+          "samples": 6,
+          "minimum": 600,
+          "maximum": 1200
+        },
+        {
+          "time": 1791986701.427173,
+          "source": "postgres",
+          "backlog": 699.0,
+          "samples": 6,
+          "minimum": 681,
+          "maximum": 719
+        },
+        {
+          "time": 1791986732.1587334,
+          "source": "postgres",
+          "backlog": 606.0,
+          "samples": 6,
+          "minimum": 400,
+          "maximum": 902
+        },
+        {
+          "time": 1791986762.8698575,
+          "source": "postgres",
+          "backlog": 583.1666666666666,
+          "samples": 6,
+          "minimum": 400,
+          "maximum": 855
+        },
+        {
+          "time": 1791986793.6108284,
+          "source": "postgres",
+          "backlog": 552.6666666666666,
+          "samples": 6,
+          "minimum": 504,
+          "maximum": 600
+        },
+        {
+          "time": 1791986824.3471503,
+          "source": "postgres",
+          "backlog": 567.6666666666666,
+          "samples": 6,
+          "minimum": 362,
+          "maximum": 800
+        },
+        {
+          "time": 1791986855.0684173,
+          "source": "postgres",
+          "backlog": 588.0,
+          "samples": 6,
+          "minimum": 407,
+          "maximum": 800
+        },
+        {
+          "time": 1791986885.763293,
+          "source": "postgres",
+          "backlog": 579.8333333333334,
+          "samples": 6,
+          "minimum": 400,
+          "maximum": 800
+        },
+        {
+          "time": 1791986916.4725623,
+          "source": "postgres",
+          "backlog": 580.6666666666666,
+          "samples": 6,
+          "minimum": 400,
+          "maximum": 794
+        },
+        {
+          "time": 1791986947.19465,
+          "source": "postgres",
+          "backlog": 539.0,
+          "samples": 6,
+          "minimum": 500,
+          "maximum": 600
+        },
+        {
+          "time": 1791986977.907007,
+          "source": "postgres",
+          "backlog": 552.8333333333334,
+          "samples": 6,
+          "minimum": 504,
+          "maximum": 600
+        },
+        {
+          "time": 1791987008.6053505,
+          "source": "postgres",
+          "backlog": 572.0,
+          "samples": 6,
+          "minimum": 504,
+          "maximum": 619
+        },
+        {
+          "time": 1791987039.3051982,
+          "source": "postgres",
+          "backlog": 571.3333333333334,
+          "samples": 6,
+          "minimum": 508,
+          "maximum": 606
+        },
+        {
+          "time": 1791987070.0344737,
+          "source": "postgres",
+          "backlog": 575.6666666666666,
+          "samples": 6,
+          "minimum": 403,
+          "maximum": 700
+        },
+        {
+          "time": 1791987100.7479217,
+          "source": "postgres",
+          "backlog": 598.3333333333334,
+          "samples": 6,
+          "minimum": 361,
+          "maximum": 800
+        },
+        {
+          "time": 1791987131.4440656,
+          "source": "postgres",
+          "backlog": 586.5,
+          "samples": 6,
+          "minimum": 307,
+          "maximum": 800
+        },
+        {
+          "time": 1791987162.1730762,
+          "source": "postgres",
+          "backlog": 584.0,
+          "samples": 6,
+          "minimum": 400,
+          "maximum": 865
+        },
+        {
+          "time": 1791987192.8729367,
+          "source": "postgres",
+          "backlog": 581.3333333333334,
+          "samples": 6,
+          "minimum": 500,
+          "maximum": 739
+        }
+      ],
+      "git_commit": "afb727e5e5601d184d4b47720586a4fea299da80"
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "screenshots/durable-5000-overload.png",
+      "run_directory": "20261014T134256Z-e33917-durable-soak",
+      "metadata": {
+        "browser": "Chrome/155.0.8059.39",
+        "url": "http://127.0.0.1:13000/d/job-scheduler?from=1791985387486&to=1791985824574&timezone=utc",
+        "window_start": 1791985387.486,
+        "window_end": 1791985824.574216,
+        "after_load": true,
+        "panels": [
+          "throughput",
+          "start latency",
+          "Kafka lag",
+          "pool saturation"
+        ]
+      }
+    },
+    {
+      "path": "screenshots/durable-1000.png",
+      "run_directory": "20261014T135120Z-ada6ab-durable-soak",
+      "metadata": {
+        "browser": "Chrome/155.0.8059.39",
+        "url": "http://127.0.0.1:13000/d/job-scheduler?from=1791985890591&to=1791986534001&timezone=utc",
+        "window_start": 1791985890.591,
+        "window_end": 1791986534.0010304,
+        "after_load": true,
+        "panels": [
+          "throughput",
+          "start latency",
+          "Kafka lag",
+          "pool saturation"
+        ]
+      }
+    },
+    {
+      "path": "screenshots/bench-5000.png",
+      "run_directory": "20261014T140248Z-0bd1f5-bench-soak",
+      "metadata": {
+        "browser": "Chrome/155.0.8059.39",
+        "url": "http://127.0.0.1:13000/d/job-scheduler?from=1791986579003&to=1791987234570&timezone=utc",
+        "window_start": 1791986579.003,
+        "window_end": 1791987234.5703394,
+        "after_load": true,
+        "panels": [
+          "throughput",
+          "start latency",
+          "Kafka lag",
+          "pool saturation"
+        ]
+      }
+    }
+  ],
+  "reconciliation": {
+    "accepted_jobs": 7414900,
+    "pending_ingest_runs": 1800300,
+    "succeeded_first_attempts": 5614600,
+    "unfinished_execution_runs": 0,
+    "discrepancies": 0
+  },
+  "validation": {
+    "date": "2026-10-14",
+    "unit": {
+      "command": "go test -race -count=1 ./...",
+      "result": "passed"
+    },
+    "integration": {
+      "command": "go test -race -count=1 -tags=integration ./test/integration",
+      "result": "passed",
+      "package_seconds": 401.039
+    },
+    "lint": {
+      "command": "make lint",
+      "result": "passed"
+    },
+    "python": {
+      "command": "python3 scripts/bench_test.py",
+      "tests": 4,
+      "result": "passed"
+    },
+    "lifecycle": {
+      "command": "bash scripts/bench_test.sh",
+      "result": "passed",
+      "coverage": "profiles, invalid input, isolated volume reset, restoration after success/failure/SIGTERM"
+    },
+    "live_screenshots": {
+      "result": "passed",
+      "count": 3,
+      "visually_verified": true,
+      "panels": [
+        "throughput",
+        "start latency",
+        "Kafka consumer lag",
+        "DB pool saturation"
+      ]
+    },
+    "final_runs": {
+      "count": 15,
+      "raw_accepted_equals_fresh_201_batches_times_100": true,
+      "raw_counts_equal_summary_and_database": true,
+      "http_failures": 0,
+      "rejected_batches": 0,
+      "dropped_iterations": 0,
+      "unfinished_execution_runs": 0,
+      "configuration_verified": true
+    },
+    "development_restoration": {
+      "running_services": [
+        "api",
+        "executor",
+        "kafka",
+        "postgres",
+        "redis",
+        "watcher"
+      ],
+      "benchmark_containers_running": 0
+    },
+    "runtime_changes_in_subset_4": false
+  },
+  "evidence": {
+    "archive": "final-evidence.tar.gz",
+    "bytes": 17394519,
+    "sha256": "02a0c8e5ba1be2429a6e1ee6f93ac8a1c1424573b57ca69491a0f2171012d22d",
+    "file_count": 188,
+    "manifest": "results/final-manifest.json",
+    "raw_k6_files_unchanged": true,
+    "allowlisted_files_only": true
+  }
+}

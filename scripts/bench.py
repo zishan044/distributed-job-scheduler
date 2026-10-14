@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import platform
 import secrets
+import shutil
 import subprocess
 import threading
 import time
@@ -337,6 +338,12 @@ def run(profile, scenario, values):
                              "p99": "histogram_quantile(0.99, " + buckets + ")"}.items()}
         save(directory / "histogram.json", histogram)
         save(directory / "summary.json", summary)
+        if os.environ.get("BENCH_SCREENSHOTS") == "1":
+            from bench_screenshot import capture
+            # Capture after measurement so browser work cannot affect the load.
+            grafana = json.loads(command(COMPOSE + ["config", "--format", "json"]))["services"]["grafana"]["environment"]
+            capture(directory, summary["window_start"] - 30, finished,
+                    grafana["GF_SECURITY_ADMIN_USER"], grafana["GF_SECURITY_ADMIN_PASSWORD"])
         print(json.dumps(summary, indent=2), flush=True)
         return 0 if summary["reconciled"] else 1
     except Exception as error:
@@ -366,6 +373,10 @@ def main():
     args = parser.parse_args()
     try:
         values = settings(args.scenario)
+        if os.environ.get("BENCH_SCREENSHOTS", "0") not in ("0", "1"):
+            raise ValueError("BENCH_SCREENSHOTS must be 0 or 1")
+        if os.environ.get("BENCH_SCREENSHOTS") == "1" and not (shutil.which("chromium") or shutil.which("google-chrome")):
+            raise ValueError("BENCH_SCREENSHOTS requires Chromium or Google Chrome")
         return 0 if args.validate else run(args.profile, args.scenario, values)
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
         print(str(error), flush=True)

@@ -72,6 +72,13 @@ class MeasurementTest(unittest.TestCase):
         result = str(bench.redact(copy.deepcopy(config)))
         self.assertNotIn("private", result)
         self.assertIn("pool_max_conns=12", result)
+        with patch.dict(os.environ, {}, clear=True), patch("sys.argv", ["bench.py", "bench", "soak", "--validate"]):
+            with patch("bench.shutil.which", return_value=None), patch("builtins.print"):
+                self.assertEqual(bench.main(), 0)
+                with patch.dict(os.environ, {"BENCH_SCREENSHOTS": "1"}):
+                    self.assertEqual(bench.main(), 1)
+                with patch.dict(os.environ, {"BENCH_SCREENSHOTS": "yes"}):
+                    self.assertEqual(bench.main(), 1)
 
     def test_backlog_and_interrupted_window(self):
         self.assertTrue(bench.growing_backlog([{"backlog": n} for n in (0, 100, 200, 300)]))
