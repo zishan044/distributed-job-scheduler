@@ -60,6 +60,9 @@ type container struct {
 	State struct {
 		Running bool `json:"Running"`
 		Paused  bool `json:"Paused"`
+		Health  struct {
+			Status string `json:"Status"`
+		} `json:"Health"`
 	} `json:"State"`
 	HostConfig struct {
 		RestartPolicy struct {
@@ -153,6 +156,7 @@ type harness struct {
 	runID     string
 	executors []container
 	watchers  []container
+	cohort    []string
 }
 
 func newHarness(t *testing.T, ctx context.Context) *harness {
@@ -245,7 +249,7 @@ func (h *harness) pause(ctx context.Context, item container) {
 
 func (h *harness) resume(ctx context.Context, item container) {
 	h.t.Helper()
-	if _, err := inspect(ctx, item.ID, "executor"); err != nil {
+	if _, err := inspect(ctx, item.ID, item.Config.Labels["com.docker.compose.service"]); err != nil {
 		h.t.Fatal(err)
 	}
 	if _, err := docker(ctx, "unpause", item.ID); err != nil {
@@ -269,6 +273,14 @@ func (h *harness) snapshot() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	h.write("http.json", target.calls(h.path))
+	if len(h.cohort) > 0 {
+		evidence, err := h.data.ChaosCohortEvidence(ctx, h.cohort)
+		if err != nil {
+			h.t.Error(err)
+		} else {
+			h.write("cohort.json", evidence)
+		}
+	}
 	workers, err := h.data.ChaosWorkers(ctx)
 	if err != nil {
 		h.t.Error(err)

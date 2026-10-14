@@ -65,15 +65,18 @@ cleanup() {
     fi
     # The chaos override uses unless-stopped; restore disabled kill victims if
     # the runner died before its Go cleanup could restore the original policy.
-    if [[ $service == executor && $policy == no ]]; then
+    if [[ ( $service == executor || $service == watcher ) && $policy == no ]]; then
       timeout 15 docker update --restart=unless-stopped "$id" >> "$CHAOS_RESULTS_DIR/cleanup.log" 2>&1 || cleanup_failed
       timeout 15 docker start "$id" >> "$CHAOS_RESULTS_DIR/cleanup.log" 2>&1 || cleanup_failed
     fi
+    case "$service" in
+      postgres|redis|kafka) timeout 15 docker start "$id" >> "$CHAOS_RESULTS_DIR/cleanup.log" 2>&1 || cleanup_failed ;;
+    esac
     timeout 10 docker inspect --format '{"id":{{json .Id}},"service":{{json (index .Config.Labels "com.docker.compose.service")}},"state":{{json .State}},"restart_count":{{.RestartCount}},"restart_policy":{{json .HostConfig.RestartPolicy}}}' "$id" >> "$CHAOS_RESULTS_DIR/containers.jsonl" || cleanup_failed
   done
   timeout 30 "${compose[@]}" logs --no-color --timestamps > "$CHAOS_RESULTS_DIR/compose.log" 2>&1 || cleanup_failed
   timeout 90 "${compose[@]}" down --volumes --remove-orphans >> "$CHAOS_RESULTS_DIR/cleanup.log" 2>&1 || cleanup_failed
-  printf '{"exit_code":%d,"requested_passes":%d,"implemented_scenarios":["duplicate_delivery","executor_kill","executor_freeze"]}\n' "$status" "$count" > "$CHAOS_RESULTS_DIR/result.json"
+  printf '{"exit_code":%d,"requested_passes":%d,"implemented_scenarios":["duplicate_delivery","executor_kill","executor_freeze","kafka_restart","postgres_restart","redis_stopped","watcher_kill"]}\n' "$status" "$count" > "$CHAOS_RESULTS_DIR/result.json"
   echo "Chaos evidence: $CHAOS_RESULTS_DIR (exit $status)"
   exit "$status"
 }
@@ -93,7 +96,7 @@ fi
 
 # Background + wait makes TERM/INT traps run while Docker is attached.
 "${compose[@]}" run --rm --no-deps -T --use-aliases --name scheduler-chaos-runner chaos-runner \
-  -test.v -test.failfast -test.count="$count" -test.timeout="$((count * 12 + 3))m" \
+  -test.v -test.failfast -test.count="$count" -test.timeout="$((count * 20 + 3))m" \
   > "$CHAOS_RESULTS_DIR/tests.jsonl" 2> "$CHAOS_RESULTS_DIR/runner.log" &
 runner_pid=$!
 status=0

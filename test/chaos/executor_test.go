@@ -20,8 +20,11 @@ import (
 )
 
 func (h *harness) scheduleHTTP(ctx context.Context) (api.Job, api.Run) {
+	return h.scheduleHTTPAt(ctx, time.Now().UTC())
+}
+
+func (h *harness) scheduleHTTPAt(ctx context.Context, now time.Time) (api.Job, api.Run) {
 	h.t.Helper()
-	now := time.Now().UTC()
 	job, err := h.client.ScheduleHTTP(ctx, api.CreateJobRequest{
 		Name: "chaos-" + h.t.Name() + h.path, ScheduledFor: &now,
 		MaxAttempts: 3, BackoffBaseMS: 500, BackoffMaxMS: 500, TimeoutMS: 120000,
@@ -89,8 +92,12 @@ func (h *harness) heldExecutor(ctx context.Context) (api.Run, container) {
 }
 
 func (h *harness) killExecutor(ctx context.Context, item container) (time.Time, func()) {
+	return h.killService(ctx, item, "executor")
+}
+
+func (h *harness) killService(ctx context.Context, item container, service string) (time.Time, func()) {
 	h.t.Helper()
-	current, err := inspect(ctx, item.ID, "executor")
+	current, err := inspect(ctx, item.ID, service)
 	if err != nil {
 		h.t.Fatal(err)
 	}
@@ -101,14 +108,14 @@ func (h *harness) killExecutor(ctx context.Context, item container) (time.Time, 
 	restore := sync.OnceFunc(func() {
 		restoreCtx, stop := context.WithTimeout(context.Background(), 30*time.Second)
 		defer stop()
-		current, err := inspect(restoreCtx, item.ID, "executor")
+		current, err := inspect(restoreCtx, item.ID, service)
 		if err == nil {
 			_, err = docker(restoreCtx, "update", "--restart="+policy, item.ID)
 		}
 		if err == nil && !current.State.Running {
 			_, err = docker(restoreCtx, "start", item.ID)
 		}
-		if err == nil {
+		if err == nil && service == "executor" {
 			err = waitFor(restoreCtx, func(ctx context.Context) error {
 				count, err := h.data.ActiveWorkers(ctx)
 				if err != nil || count != 3 {
@@ -117,10 +124,13 @@ func (h *harness) killExecutor(ctx context.Context, item container) (time.Time, 
 				return nil
 			})
 		}
+		if err == nil {
+			err = h.waitService(restoreCtx, item)
+		}
 		if err != nil {
-			h.t.Errorf("restore killed executor: %v", err)
+			h.t.Errorf("restore killed %s: %v", service, err)
 		} else {
-			h.event("restored_executor", map[string]any{"id": item.ID, "restart_policy": policy})
+			h.event("restored_"+service, map[string]any{"id": item.ID, "restart_policy": policy})
 		}
 	})
 	h.t.Cleanup(restore) // Includes an ambiguous update/kill response.
@@ -131,7 +141,7 @@ func (h *harness) killExecutor(ctx context.Context, item container) (time.Time, 
 	if _, err := docker(ctx, "kill", "--signal=KILL", item.ID); err != nil {
 		h.t.Fatal(err)
 	}
-	h.event("killed_executor", map[string]any{"id": item.ID, "at": killedAt.UTC(), "original_restart_policy": policy})
+	h.event("killed_"+service, map[string]any{"id": item.ID, "at": killedAt.UTC(), "original_restart_policy": policy})
 	return killedAt, restore
 }
 

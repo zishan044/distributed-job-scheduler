@@ -14,12 +14,16 @@ set -euo pipefail
 printf '%s\n' "$*" >> "$CHAOS_TEST_LOG"
 case "$*" in
   'ps -a -q --filter label=com.docker.compose.project=scheduler-chaos')
-    printf 'runner-id\npaused-id\n'
+    printf 'runner-id\npaused-id\nwatcher-id\nredis-id\n'
     if [[ ${CHAOS_TEST_FOREIGN:-0} == 1 ]]; then echo foreign-id; fi ;;
   'inspect --format '*runner-id)
     echo 'scheduler-chaos chaos-runner false no' ;;
   'inspect --format '*paused-id)
     echo 'scheduler-chaos executor true no' ;;
+  'inspect --format '*watcher-id)
+    echo 'scheduler-chaos watcher false no' ;;
+  'inspect --format '*redis-id)
+    echo 'scheduler-chaos redis false unless-stopped' ;;
   'inspect --format '*foreign-id)
     echo 'development executor true no' ;;
   *' build '*) exit "${CHAOS_TEST_BUILD_STATUS:-0}" ;;
@@ -43,6 +47,9 @@ restored() {
   contains 'unpause paused-id'
   contains 'update --restart=unless-stopped paused-id'
   contains 'start paused-id'
+  contains 'update --restart=unless-stopped watcher-id'
+  contains 'start watcher-id'
+  contains 'start redis-id'
   ! contains 'unpause foreign-id'
   ! contains 'update --restart=unless-stopped foreign-id'
   contains 'compose -p scheduler-chaos -f docker-compose.yml -f docker-compose.chaos.yml logs --no-color --timestamps'
