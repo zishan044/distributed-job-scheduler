@@ -17,11 +17,11 @@ case "$*" in
     printf 'runner-id\npaused-id\n'
     if [[ ${CHAOS_TEST_FOREIGN:-0} == 1 ]]; then echo foreign-id; fi ;;
   'inspect --format '*runner-id)
-    echo 'scheduler-chaos chaos-runner false' ;;
+    echo 'scheduler-chaos chaos-runner false no' ;;
   'inspect --format '*paused-id)
-    echo 'scheduler-chaos executor true' ;;
+    echo 'scheduler-chaos executor true no' ;;
   'inspect --format '*foreign-id)
-    echo 'development executor true' ;;
+    echo 'development executor true no' ;;
   *' build '*) exit "${CHAOS_TEST_BUILD_STATUS:-0}" ;;
   *' run '*)
     if [[ ${CHAOS_TEST_SIGNAL:-0} == 1 ]]; then kill -TERM "$PPID"; fi
@@ -41,7 +41,10 @@ contains() { rg -Fqx -- "$1" "$CHAOS_TEST_LOG"; }
 restored() {
   contains 'stop --time 10 runner-id'
   contains 'unpause paused-id'
+  contains 'update --restart=unless-stopped paused-id'
+  contains 'start paused-id'
   ! contains 'unpause foreign-id'
+  ! contains 'update --restart=unless-stopped foreign-id'
   contains 'compose -p scheduler-chaos -f docker-compose.yml -f docker-compose.chaos.yml logs --no-color --timestamps'
   contains 'compose -p scheduler-chaos -f docker-compose.yml -f docker-compose.chaos.yml down --volumes --remove-orphans'
   ! rg -q 'scheduler-bench|stop .*dev-' "$CHAOS_TEST_LOG"

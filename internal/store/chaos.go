@@ -18,6 +18,32 @@ type ChaosAttempt struct {
 	Error      string     `json:"error"`
 }
 
+type ChaosWorker struct {
+	ID             string    `json:"id"`
+	Hostname       string    `json:"hostname"`
+	LastHeartbeat  time.Time `json:"last_heartbeat"`
+	LeaseExpiresAt time.Time `json:"lease_expires_at"`
+	Live           bool      `json:"live"`
+}
+
+func (s *Store) ChaosWorkers(ctx context.Context) ([]ChaosWorker, error) {
+	rows, err := s.pool.Query(ctx, `SELECT id::text, hostname, last_heartbeat,
+		lease_expires_at, lease_expires_at > clock_timestamp() FROM workers ORDER BY started_at`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	workers := make([]ChaosWorker, 0)
+	for rows.Next() {
+		var worker ChaosWorker
+		if err := rows.Scan(&worker.ID, &worker.Hostname, &worker.LastHeartbeat, &worker.LeaseExpiresAt, &worker.Live); err != nil {
+			return nil, err
+		}
+		workers = append(workers, worker)
+	}
+	return workers, rows.Err()
+}
+
 func (s *Store) ChaosAttempts(ctx context.Context, runID string) ([]ChaosAttempt, error) {
 	id, err := parseUUID(runID)
 	if err != nil {

@@ -65,6 +65,18 @@ func TestTargetHoldRelease(t *testing.T) {
 	if len(calls) != 1 || calls[0].FinishedAt != nil || calls[0].IdempotencyKey != "run-id" || calls[0].Attempt != 1 {
 		t.Fatalf("held call = %+v", calls)
 	}
+	retry := request.Clone(ctx)
+	retry.Header.Set("X-Job-Attempt", "2")
+	response, err := http.DefaultClient.Do(retry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = response.Body.Close()
+	calls = f.calls("/held")
+	if response.StatusCode != http.StatusOK || len(calls) != 2 || calls[0].FinishedAt != nil ||
+		calls[1].Attempt != 2 || calls[1].FinishedAt == nil || calls[1].IdempotencyKey != "run-id" {
+		t.Fatalf("attempt 2 was not independent of held attempt 1: %+v", calls)
+	}
 	release()
 	if err := <-done; err != nil {
 		t.Fatal(err)

@@ -22,29 +22,8 @@ func TestDuplicateDelivery(t *testing.T) {
 	for _, item := range h.executors {
 		h.pause(ctx, item)
 	}
-	now := time.Now().UTC()
-	job, err := h.client.ScheduleHTTP(ctx, api.CreateJobRequest{
-		Name: "chaos-duplicate" + h.path, ScheduledFor: &now,
-		MaxAttempts: 3, BackoffBaseMS: 500, BackoffMaxMS: 500, TimeoutMS: 120000,
-	}, api.HTTPPayload{URL: "http://chaos-runner:8090" + h.path, Method: "POST"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	runs, err := h.client.ListRuns(ctx, job.ID, 100, 0)
-	if err != nil || len(runs) != 1 {
-		t.Fatalf("initial runs = %v, %v", runs, err)
-	}
-	h.runID = runs[0].ID
-	var run api.Run
-	if err := waitFor(ctx, func(ctx context.Context) error {
-		run, err = h.client.Get(ctx, h.runID)
-		if err != nil || run.Status != api.StatusQueued {
-			return fmt.Errorf("waiting for QUEUED: %+v, %v", run, err)
-		}
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
+	job, initial := h.scheduleHTTP(ctx)
+	run := h.waitRun(ctx, api.StatusQueued)
 	if calls := target.calls(h.path); len(calls) != 0 {
 		t.Fatalf("execution occurred while all executors were paused: %+v", calls)
 	}
@@ -69,15 +48,7 @@ func TestDuplicateDelivery(t *testing.T) {
 	for _, item := range h.executors {
 		h.resume(ctx, item)
 	}
-	if err := waitFor(ctx, func(ctx context.Context) error {
-		run, err = h.client.Get(ctx, h.runID)
-		if err != nil || run.Status != api.StatusSucceeded {
-			return fmt.Errorf("waiting for SUCCEEDED: %+v, %v", run, err)
-		}
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
+	run = h.waitRun(ctx, api.StatusSucceeded)
 	transport := &kafka.Transport{}
 	defer transport.CloseIdleConnections()
 	broker := &kafka.Client{Addr: kafka.TCP("kafka:9092"), Transport: transport}
@@ -100,7 +71,7 @@ func TestDuplicateDelivery(t *testing.T) {
 		calls[0].FinishedAt == nil || calls[0].Cancelled {
 		t.Fatalf("HTTP executions = %+v; want exactly one completed call", calls)
 	}
-	if run.Attempt != 1 || run.ID != runs[0].ID || !run.FireTime.Equal(runs[0].FireTime) {
+	if run.Attempt != 1 || run.ID != initial.ID || !run.FireTime.Equal(initial.FireTime) {
 		t.Fatalf("run identity changed: %+v", run)
 	}
 	h.event("verified", map[string]any{"run": run, "attempts": attempts, "http": calls, "kafka_lag": 0})

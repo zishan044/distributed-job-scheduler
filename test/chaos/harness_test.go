@@ -61,6 +61,12 @@ type container struct {
 		Running bool `json:"Running"`
 		Paused  bool `json:"Paused"`
 	} `json:"State"`
+	HostConfig struct {
+		RestartPolicy struct {
+			Name              string `json:"Name"`
+			MaximumRetryCount int    `json:"MaximumRetryCount"`
+		} `json:"RestartPolicy"`
+	} `json:"HostConfig"`
 	RestartCount    int `json:"RestartCount"`
 	NetworkSettings struct {
 		Networks map[string]struct {
@@ -263,6 +269,12 @@ func (h *harness) snapshot() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	h.write("http.json", target.calls(h.path))
+	workers, err := h.data.ChaosWorkers(ctx)
+	if err != nil {
+		h.t.Error(err)
+	} else {
+		h.write("workers.json", workers)
+	}
 	if h.runID != "" {
 		run, err := h.data.GetRun(ctx, h.runID)
 		if err != nil {

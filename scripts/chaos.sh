@@ -21,9 +21,9 @@ compose=(docker compose -p scheduler-chaos -f docker-compose.yml -f docker-compo
 "${compose[@]}" config --quiet
 
 inspect_owned() {
-  local labels project service paused
-  labels=$(timeout 10 docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}} {{index .Config.Labels "com.docker.compose.service"}} {{.State.Paused}}' "$1") || return 1
-  read -r project service paused <<< "$labels"
+  local labels project service paused policy
+  labels=$(timeout 10 docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}} {{index .Config.Labels "com.docker.compose.service"}} {{.State.Paused}} {{.HostConfig.RestartPolicy.Name}}' "$1") || return 1
+  read -r project service paused policy <<< "$labels"
   [[ $project == scheduler-chaos ]] || return 1
   case "$service" in
     chaos-runner|api|watcher|executor|postgres|redis|kafka|migrate|topic-init) ;;
@@ -46,7 +46,7 @@ cleanup() {
       cleanup_failed
       continue
     fi
-    read -r project service paused <<< "$labels"
+    read -r project service paused policy <<< "$labels"
     if [[ $service == chaos-runner ]]; then
       timeout 20 docker stop --time 10 "$id" >/dev/null || cleanup_failed
     fi
@@ -59,15 +59,21 @@ cleanup() {
       cleanup_failed
       continue
     fi
-    read -r project service paused <<< "$labels"
+    read -r project service paused policy <<< "$labels"
     if [[ $paused == true ]]; then
       timeout 15 docker unpause "$id" >> "$CHAOS_RESULTS_DIR/cleanup.log" 2>&1 || cleanup_failed
     fi
-    timeout 10 docker inspect --format '{"id":{{json .Id}},"service":{{json (index .Config.Labels "com.docker.compose.service")}},"state":{{json .State}},"restart_count":{{.RestartCount}}}' "$id" >> "$CHAOS_RESULTS_DIR/containers.jsonl" || cleanup_failed
+    # The chaos override uses unless-stopped; restore disabled kill victims if
+    # the runner died before its Go cleanup could restore the original policy.
+    if [[ $service == executor && $policy == no ]]; then
+      timeout 15 docker update --restart=unless-stopped "$id" >> "$CHAOS_RESULTS_DIR/cleanup.log" 2>&1 || cleanup_failed
+      timeout 15 docker start "$id" >> "$CHAOS_RESULTS_DIR/cleanup.log" 2>&1 || cleanup_failed
+    fi
+    timeout 10 docker inspect --format '{"id":{{json .Id}},"service":{{json (index .Config.Labels "com.docker.compose.service")}},"state":{{json .State}},"restart_count":{{.RestartCount}},"restart_policy":{{json .HostConfig.RestartPolicy}}}' "$id" >> "$CHAOS_RESULTS_DIR/containers.jsonl" || cleanup_failed
   done
   timeout 30 "${compose[@]}" logs --no-color --timestamps > "$CHAOS_RESULTS_DIR/compose.log" 2>&1 || cleanup_failed
   timeout 90 "${compose[@]}" down --volumes --remove-orphans >> "$CHAOS_RESULTS_DIR/cleanup.log" 2>&1 || cleanup_failed
-  printf '{"exit_code":%d,"requested_passes":%d,"implemented_scenarios":["duplicate_delivery"]}\n' "$status" "$count" > "$CHAOS_RESULTS_DIR/result.json"
+  printf '{"exit_code":%d,"requested_passes":%d,"implemented_scenarios":["duplicate_delivery","executor_kill","executor_freeze"]}\n' "$status" "$count" > "$CHAOS_RESULTS_DIR/result.json"
   echo "Chaos evidence: $CHAOS_RESULTS_DIR (exit $status)"
   exit "$status"
 }

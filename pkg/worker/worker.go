@@ -140,6 +140,8 @@ func (w *Worker) Run(ctx context.Context) error {
 	defer data.Close()
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: w.config.KafkaBrokers, Topic: "jobs.run", GroupID: "executors", CommitInterval: 0,
+		// Reassign the run-ID partition before the 15s DB lease recovers its jobs.
+		SessionTimeout: 10 * time.Second,
 	})
 	defer func() {
 		if err := reader.Close(); err != nil {
