@@ -1,0 +1,48 @@
+# Isolated, durable stack; started explicitly by scripts/chaos.sh.
+name: scheduler-chaos
+
+services:
+  postgres:
+    command: [postgres, -c, synchronous_commit=on, -c, fsync=on]
+
+  migrate:
+    image: distributed-job-scheduler-migrate:chaos
+
+  api:
+    image: distributed-job-scheduler-api:chaos
+    ports: !reset []
+    environment:
+      API_KEY: chaos-local
+
+  watcher:
+    image: distributed-job-scheduler-watcher:chaos
+    deploy:
+      replicas: 2
+
+  executor:
+    image: distributed-job-scheduler-executor:chaos
+    environment:
+      EXECUTOR_CONCURRENCY: 10
+      HTTP_ALLOWED_HOSTS: chaos-runner
+    deploy:
+      replicas: 3
+
+  prometheus:
+    ports: !reset []
+
+  grafana:
+    ports: !reset []
+
+  chaos-runner:
+    profiles: [tools]
+    image: distributed-job-scheduler-chaos:chaos
+    build:
+      context: .
+      dockerfile: test/chaos/Dockerfile
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-scheduler}:${POSTGRES_PASSWORD:-scheduler}@postgres:5432/${POSTGRES_DB:-scheduler}?sslmode=disable
+      API_KEY: chaos-local
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${CHAOS_RESULTS_DIR:?Run make chaos}:/results
+    restart: "no"

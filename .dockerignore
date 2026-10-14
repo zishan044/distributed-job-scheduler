@@ -3,5 +3,7 @@
 bin
 docs/bench/results
 docs/bench/*.tar.gz
+docs/chaos/results
+docs/chaos/*.tar.gz
 scripts/__pycache__
 Distributed Job Scheduler in Go Implementation Plan.md

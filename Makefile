@@ -1,7 +1,8 @@
-.PHONY: up down logs build test lint smoke bench
+.PHONY: up down logs build test lint smoke bench chaos
 
 BENCH_PROFILE ?= durable
 BENCH_SCENARIO ?= setup
+CHAOS_COUNT ?= 1
 
 up:
 	docker compose up --build
@@ -20,6 +21,9 @@ smoke:
 
 bench:
 	bash scripts/bench.sh "$(BENCH_PROFILE)" "$(BENCH_SCENARIO)"
+
+chaos:
+	bash scripts/chaos.sh "$(CHAOS_COUNT)"
 
 test:
 	go test -count=1 ./...

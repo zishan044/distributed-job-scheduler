@@ -35,6 +35,9 @@ go.work.sum
 # Local benchmark output; publish selected evidence as a single archive.
 /docs/bench/results/
 
+# Keep selected chaos evidence; omit local run directories.
+/docs/chaos/results/
+
 # Editor/IDE
 # .idea/
 # .vscode/
